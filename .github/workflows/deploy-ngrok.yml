@@ -1,0 +1,70 @@
+name: Deploy to Ngrok
+
+on:
+  push:
+    branches:
+      - main
+      - master
+  workflow_dispatch: # Allows manual triggering
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Set up JDK
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+      
+      - name: Setup Gradle
+        uses: gradle/gradle-build-action@v2
+      
+      - name: Build project
+        run: ./gradlew build --no-daemon
+      
+      - name: Setup Ngrok
+        uses: ngrok/setup-ngrok@v3
+        with:
+          authtoken: ${{ secrets.NGROK_AUTHTOKEN }}
+      
+      - name: Start Ktor server
+        run: |
+          ./gradlew run --no-daemon &
+          sleep 10 # Wait for server to start
+        env:
+          JAVA_OPTS: -Xmx512m
+      
+      - name: Start Ngrok tunnel
+        run: |
+          ngrok http 8080 --log=stdout > ngrok.log &
+          sleep 5 # Wait for ngrok to start
+          
+          # Extract the public URL from ngrok API
+          NGROK_URL=$(curl -s http://localhost:4040/api/tunnels | grep -o '"public_url":"https://[^"]*"' | head -1 | cut -d'"' -f4)
+          echo "NGROK_URL=$NGROK_URL" >> $GITHUB_ENV
+          echo "🚀 Your Ktor server is now accessible at: $NGROK_URL"
+      
+      - name: Display Ngrok URL
+        run: |
+          echo "=========================================="
+          echo "🌐 Ngrok Public URL:"
+          echo "${{ env.NGROK_URL }}"
+          echo "=========================================="
+          echo ""
+          echo "Test your endpoints:"
+          echo "  - ${{ env.NGROK_URL }}/"
+          echo "  - ${{ env.NGROK_URL }}/health"
+          echo ""
+          echo "Note: This URL will be active for 2 hours (free ngrok limit)"
+      
+      - name: Keep server running
+        run: |
+          # Keep the workflow running to maintain the tunnel
+          # This will run until the workflow times out (6 hours max for free tier)
+          tail -f /dev/null
+

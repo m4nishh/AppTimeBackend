@@ -1,0 +1,9 @@
+Current Active Ngrok URL: https://7d76ddc7b74f.ngrok-free.app
+
+Update your API client to use this URL instead of the old one.
+
+Test command:
+curl -H "ngrok-skip-browser-warning: true" \
+  -H "Accept: application/json" \
+  "https://7d76ddc7b74f.ngrok-free.app/api/challenges/active"
+
