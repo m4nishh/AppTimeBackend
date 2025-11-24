@@ -27,7 +27,7 @@ object DatabaseFactory {
         val jdbcUrl = System.getenv("DATABASE_URL")
             ?: "jdbc:postgresql://localhost:5432/screentime_db"
         val dbUser = System.getenv("DB_USER") ?: "postgres"
-        val dbPassword = System.getenv("DB_PASSWORD") ?: "postgres"
+        val dbPassword = System.getenv("DB_PASSWORD") ?: "Sharma@11"
 
         val config = HikariConfig().apply {
             this.jdbcUrl = jdbcUrl
