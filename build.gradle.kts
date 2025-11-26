@@ -4,6 +4,7 @@ plugins {
     kotlin("jvm") version "1.9.22"
     kotlin("plugin.serialization") version "1.9.22"
     application
+    id("com.github.johnrengelman.shadow") version "7.1.2"
 }
 
 group = "com.apptime.code"
@@ -56,6 +57,20 @@ application {
         "-Duser.country=IN",
         "-Duser.language=en"
     )
+}
+
+// Configure Shadow plugin to create fat JAR
+tasks.shadowJar {
+    archiveBaseName.set("AppTimeBackend")
+    archiveClassifier.set("")  // Remove "-all" classifier to make it the main JAR
+    manifest {
+        attributes(mapOf("Main-Class" to "MainKt"))
+    }
+}
+
+// Make shadowJar run as part of build
+tasks.build {
+    dependsOn(tasks.shadowJar)
 }
 
 // Task to clear all database tables
