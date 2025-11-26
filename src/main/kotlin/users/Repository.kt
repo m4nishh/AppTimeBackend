@@ -47,7 +47,7 @@ class UserRepository {
     /**
      * Register a new device/user
      */
-    fun registerDevice(deviceInfo: DeviceInfo): DeviceRegistrationResponse {
+    fun registerDevice(deviceInfo: DeviceInfo, firebaseToken: String? = null): DeviceRegistrationResponse {
         return dbTransaction {
             val userId = generateEncryptedUserId(deviceInfo.deviceId)
 
@@ -75,6 +75,10 @@ class UserRepository {
                     it[hardware] = deviceInfo.hardware
                     it[androidVersion] = deviceInfo.androidVersion
                     it[sdkVersion] = deviceInfo.sdkVersion
+                    // Update firebaseToken if provided
+                    if (firebaseToken != null) {
+                        it[Users.firebaseToken] = firebaseToken
+                    }
                     it[updatedAt] = kotlinx.datetime.Clock.System.now()
                 }
 
@@ -110,6 +114,7 @@ class UserRepository {
                 it[sdkVersion] = deviceInfo.sdkVersion
                 it[this.totpSecret] = totpSecret
                 it[totpEnabled] = true
+                it[Users.firebaseToken] = firebaseToken
                 it[createdAt] = now
                 it[updatedAt] = now
             }
@@ -137,6 +142,7 @@ class UserRepository {
                         username = row[Users.username],
                         email = row[Users.email],
                         name = row[Users.name],
+                        firebaseToken = row[Users.firebaseToken],
                         createdAt = row[Users.createdAt].toString(),
                         updatedAt = row[Users.updatedAt].toString(),
                         lastSyncTime = row[Users.lastSyncTime]?.toString() // ISO 8601 format
@@ -174,6 +180,19 @@ class UserRepository {
             }
             
             // Return updated profile
+            getUserById(userId)
+        }
+    }
+    
+    /**
+     * Update user's Firebase token
+     */
+    fun updateFirebaseToken(userId: String, firebaseToken: String?): UserProfile? {
+        return dbTransaction {
+            Users.update({ Users.userId eq userId }) {
+                it[Users.firebaseToken] = firebaseToken
+                it[Users.updatedAt] = kotlinx.datetime.Clock.System.now()
+            }
             getUserById(userId)
         }
     }
@@ -267,6 +286,7 @@ class UserRepository {
                         username = row[Users.username],
                         email = row[Users.email],
                         name = row[Users.name],
+                        firebaseToken = row[Users.firebaseToken],
                         createdAt = row[Users.createdAt].toString(),
                         updatedAt = row[Users.updatedAt].toString(),
                         lastSyncTime = row[Users.lastSyncTime]?.toString() // ISO 8601 format

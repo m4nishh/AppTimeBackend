@@ -11,10 +11,16 @@ object Challenges : Table("challenges") {
     val title = varchar("title", 255)
     val description = text("description").nullable()
     val reward = varchar("reward", 255).nullable()
+    val prize = text("prize").nullable() // HTML string with rank-based prizes (e.g., "Rank 1: 100, Rank 2: 50, Rank 3: 10")
+    val rules = text("rules").nullable() // HTML string with challenge rules
     val startTime = timestamp("start_time")
     val endTime = timestamp("end_time")
     val thumbnail = varchar("thumbnail", 500).nullable()
     val challengeType = varchar("challenge_type", 50) // "LESS_SCREENTIME" or "MORE_SCREENTIME"
+    val packageNames = text("package_names").nullable() // Comma-separated package names (e.g., "com.android.chrome,com.google.android.apps.chrome")
+    val displayType = varchar("display_type", 50).nullable() // Challenge display type (SPECIAL, TRENDING, QUICK_JOIN, FEATURE)
+    val tags = text("tags").nullable() // Comma-separated challenge tags (e.g., "browser,study,gaming,social media")
+    val sponsor = varchar("sponsor", 255).nullable() // Challenge sponsor name
     val isActive = bool("is_active").default(true)
     val createdAt = timestamp("created_at").clientDefault { kotlinx.datetime.Clock.System.now() }
     

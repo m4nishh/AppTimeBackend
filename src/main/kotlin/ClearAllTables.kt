@@ -1,5 +1,8 @@
 import com.apptime.code.blockeddomains.BlockedDomainGroups
 import com.apptime.code.blockeddomains.BlockedDomains
+import com.apptime.code.challenges.ChallengeParticipantStats
+import com.apptime.code.challenges.ChallengeParticipants
+import com.apptime.code.challenges.Challenges
 import com.apptime.code.consents.ConsentTemplates
 import com.apptime.code.consents.UserConsents
 import com.apptime.code.focus.FocusSessions
@@ -26,6 +29,15 @@ fun main() {
             
             println("  - Clearing app_usage_events...")
             AppUsageEvents.deleteAll()
+            
+            println("  - Clearing challenge_participant_stats...")
+            ChallengeParticipantStats.deleteAll()
+            
+            println("  - Clearing challenge_participants...")
+            ChallengeParticipants.deleteAll()
+            
+            println("  - Clearing challenges...")
+            Challenges.deleteAll()
             
             println("  - Clearing focus_mode_stats...")
             FocusModeStats.deleteAll()

@@ -14,7 +14,7 @@ class UserService(private val repository: UserRepository) {
             throw IllegalArgumentException("Device ID is required")
         }
         
-        return repository.registerDevice(request.deviceInfo)
+        return repository.registerDevice(request.deviceInfo, request.firebaseToken)
     }
     
     /**
@@ -29,9 +29,9 @@ class UserService(private val repository: UserRepository) {
     }
     
     /**
-     * Update user profile - only username can be updated for now
+     * Update user profile - username and firebaseToken can be updated
      */
-    suspend fun updateUserProfile(userId: String, username: String?): UserProfile? {
+    suspend fun updateUserProfile(userId: String, username: String?, firebaseToken: String? = null): UserProfile? {
         if (userId.isBlank()) {
             throw IllegalArgumentException("User ID is required")
         }
@@ -41,12 +41,17 @@ class UserService(private val repository: UserRepository) {
             throw IllegalArgumentException("User not found")
         }
 
-        // Only update username if provided
+        // Update username if provided
         if (username != null && username.isNotBlank()) {
-            return repository.updateUsername(userId, username)
+            repository.updateUsername(userId, username)
+        }
+        
+        // Update firebaseToken if provided
+        if (firebaseToken != null) {
+            repository.updateFirebaseToken(userId, firebaseToken)
         }
 
-        // If no username provided, just return current profile
+        // Return updated profile
         return repository.getUserById(userId)
     }
     

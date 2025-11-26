@@ -200,20 +200,20 @@ fun Application.configureUserRoutes() {
 
                 /**
                  * PUT /api/v1/user/profile
-                 * Update authenticated user's profile - only username can be updated (requires authentication)
+                 * Update authenticated user's profile - username and firebaseToken can be updated (requires authentication)
                  */
                 put("/profile") {
                     try {
                         val userId = call.requireUserId()
                         val request = call.receive<UpdateProfileRequest>()
 
-                        // Only username can be updated for now
-                        if (request.username.isNullOrBlank()) {
-                            call.respondError(HttpStatusCode.BadRequest, "Username is required for update")
+                        // At least one field must be provided
+                        if (request.username.isNullOrBlank() && request.firebaseToken.isNullOrBlank()) {
+                            call.respondError(HttpStatusCode.BadRequest, "At least one field (username or firebaseToken) is required for update")
                             return@put
                         }
 
-                        val updatedProfile = service.updateUserProfile(userId, request.username)
+                        val updatedProfile = service.updateUserProfile(userId, request.username, request.firebaseToken)
 
                         if (updatedProfile != null) {
                             call.respondApi(updatedProfile, "Profile updated successfully")

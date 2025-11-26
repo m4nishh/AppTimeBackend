@@ -51,6 +51,11 @@ tasks.withType<KotlinCompile> {
 
 application {
     mainClass.set("MainKt")
+    applicationDefaultJvmArgs = listOf(
+        "-Duser.timezone=Asia/Kolkata",
+        "-Duser.country=IN",
+        "-Duser.language=en"
+    )
 }
 
 // Task to clear all database tables
@@ -74,5 +79,21 @@ tasks.register<JavaExec>("clearUsageEvents") {
     group = "database"
     description = "Clear all data from app_usage_events table (synced usage data)"
     mainClass.set("ClearUsageEventsKt")
+    classpath = sourceSets["main"].runtimeClasspath
+}
+
+// Task to clear challenges tables
+tasks.register<JavaExec>("clearChallenges") {
+    group = "database"
+    description = "Clear all data from challenges tables (challenges, challenge_participants, challenge_participant_stats)"
+    mainClass.set("ClearChallengesKt")
+    classpath = sourceSets["main"].runtimeClasspath
+}
+
+// Task to clear all user-related data (keeping challenges)
+tasks.register<JavaExec>("clearUserData") {
+    group = "database"
+    description = "Clear all user-related data (users, usage events, participants, etc.) while keeping challenges list"
+    mainClass.set("ClearUserDataKt")
     classpath = sourceSets["main"].runtimeClasspath
 }

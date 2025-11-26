@@ -22,21 +22,47 @@ class ChallengeRepository {
             } else {
                 emptySet()
             }
-            Challenges.select {
+            val challenges = Challenges.select {
                 (Challenges.isActive eq true) and
                 (Challenges.endTime greater now)
             }
             .orderBy(Challenges.startTime to SortOrder.ASC)
-            .map { row ->
-                val challengeId = row[Challenges.id]
+            .map { row -> row[Challenges.id] to row }
+            
+            // Get participant counts for all challenges in one query
+            val challengeIds = challenges.map { it.first }
+            val participantCounts = if (challengeIds.isNotEmpty()) {
+                ChallengeParticipants.select {
+                    ChallengeParticipants.challengeId inList challengeIds
+                }
+                .groupBy { it[ChallengeParticipants.challengeId] }
+                .mapValues { it.value.size }
+            } else {
+                emptyMap()
+            }
+            
+            challenges.map { (challengeId, row) ->
+                val tagsString = row[Challenges.tags]
+                val tagsList = if (tagsString.isNullOrBlank()) {
+                    emptyList()
+                } else {
+                    tagsString.split(",").map { it.trim() }.filter { it.isNotBlank() }
+                }
                 ActiveChallenge(
                     id = challengeId,
                     title = row[Challenges.title],
                     description = row[Challenges.description],
                     reward = row[Challenges.reward],
+                    prize = row[Challenges.prize],
+                    rules = row[Challenges.rules],
+                    displayType = row[Challenges.displayType],
+                    tags = tagsList,
+                    sponsor = row[Challenges.sponsor],
                     startTime = row[Challenges.startTime].toString(),
                     endTime = row[Challenges.endTime].toString(),
                     thumbnail = row[Challenges.thumbnail],
+                    packageNames = row[Challenges.packageNames],
+                    participantCount = participantCounts[challengeId] ?: 0,
                     hasJoined = joinedChallengeIds.contains(challengeId)
                 )
             }
@@ -135,15 +161,27 @@ class ChallengeRepository {
                 ChallengeParticipants.challengeId eq challengeId
             }.count().toInt()
             
+            val tagsString = challenge[Challenges.tags]
+            val tagsList = if (tagsString.isNullOrBlank()) {
+                emptyList()
+            } else {
+                tagsString.split(",").map { it.trim() }.filter { it.isNotBlank() }
+            }
             ChallengeDetail(
                 id = challenge[Challenges.id],
                 title = challenge[Challenges.title],
                 description = challenge[Challenges.description],
                 reward = challenge[Challenges.reward],
+                prize = challenge[Challenges.prize],
+                rules = challenge[Challenges.rules],
+                displayType = challenge[Challenges.displayType],
+                tags = tagsList,
+                sponsor = challenge[Challenges.sponsor],
                 startTime = challenge[Challenges.startTime].toString(),
                 endTime = challenge[Challenges.endTime].toString(),
                 thumbnail = challenge[Challenges.thumbnail],
                 challengeType = challenge[Challenges.challengeType],
+                packageNames = challenge[Challenges.packageNames],
                 isActive = challenge[Challenges.isActive],
                 participantCount = participantCount,
                 createdAt = challenge[Challenges.createdAt].toString()
@@ -269,6 +307,35 @@ class ChallengeRepository {
             ChallengeParticipants.select {
                 ChallengeParticipants.challengeId eq challengeId
             }.count().toInt()
+        }
+    }
+    
+    /**
+     * Get last sync time for a user in a challenge
+     * Returns the most recent endSyncTime from challenge_participant_stats
+     */
+    fun getLastSyncTime(userId: String, challengeId: Long): String? {
+        return dbTransaction {
+            ChallengeParticipantStats.select {
+                (ChallengeParticipantStats.challengeId eq challengeId) and
+                (ChallengeParticipantStats.userId eq userId)
+            }
+            .orderBy(ChallengeParticipantStats.endSyncTime to SortOrder.DESC)
+            .limit(1)
+            .firstOrNull()
+            ?.let { it[ChallengeParticipantStats.endSyncTime].toString() }
+        }
+    }
+    
+    /**
+     * Check if user has submitted any stats for a challenge
+     */
+    fun hasUserSubmittedStats(userId: String, challengeId: Long): Boolean {
+        return dbTransaction {
+            ChallengeParticipantStats.select {
+                (ChallengeParticipantStats.challengeId eq challengeId) and
+                (ChallengeParticipantStats.userId eq userId)
+            }.count() > 0
         }
     }
 }

@@ -97,5 +97,20 @@ class AppUsageEventRepository {
             }
         }
     }
+    
+    /**
+     * Get the last sync time for a user (most recent eventTimestamp)
+     */
+    fun getLastSyncTime(userId: String): Instant? {
+        return dbTransaction {
+            AppUsageEvents.select {
+                AppUsageEvents.userId eq userId
+            }
+            .orderBy(AppUsageEvents.eventTimestamp to SortOrder.DESC)
+            .limit(1)
+            .firstOrNull()
+            ?.get(AppUsageEvents.eventTimestamp)
+        }
+    }
 }
 

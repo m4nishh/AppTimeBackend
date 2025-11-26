@@ -17,7 +17,8 @@ data class DeviceInfo(
 
 @Serializable
 data class DeviceRegistrationRequest(
-    val deviceInfo: DeviceInfo
+    val deviceInfo: DeviceInfo,
+    val firebaseToken: String? = null // Optional Firebase Cloud Messaging (FCM) token
 )
 
 @Serializable
@@ -35,6 +36,7 @@ data class UserProfile(
     val username: String? = null,
     val email: String? = null,
     val name: String? = null,
+    val firebaseToken: String? = null, // Firebase Cloud Messaging (FCM) token
     val createdAt: String? = null,
     val updatedAt: String? = null,
     val lastSyncTime: String? = null // ISO 8601 format - syncTime from usage events batch request

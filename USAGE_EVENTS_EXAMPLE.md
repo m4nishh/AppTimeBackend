@@ -186,10 +186,58 @@ curl -X GET 'https://ec3bedfc01c5.ngrok-free.app/api/usage/stats/daily?date=2025
 }
 ```
 
+## Get Last Sync Time
+
+### GET /api/usage/stats/last-sync
+
+Get the last sync time for app usage stats. Returns the most recent `eventTimestamp` from the `app_usage_events` table for the authenticated user.
+
+**cURL Command:**
+```bash
+curl -X GET 'https://7d76ddc7b74f.ngrok-free.app/api/usage/stats/last-sync' \
+  -H 'Authorization: Bearer YOUR_USER_ID' \
+  -H 'Accept: application/json'
+```
+
+**Response (when user has events):**
+```json
+{
+  "success": true,
+  "status": 200,
+  "data": {
+    "userId": "b002e76b-baa5-4bea-9d97-958f5405beba",
+    "lastSyncTime": "2025-11-21T20:17:53.961Z",
+    "hasEvents": true
+  },
+  "message": "Last sync time retrieved successfully",
+  "timestamp": "2025-11-21T20:18:00.123Z",
+  "error": null
+}
+```
+
+**Response (when user has no events):**
+```json
+{
+  "success": true,
+  "status": 200,
+  "data": {
+    "userId": "b002e76b-baa5-4bea-9d97-958f5405beba",
+    "lastSyncTime": null,
+    "hasEvents": false
+  },
+  "message": "Last sync time retrieved successfully",
+  "timestamp": "2025-11-21T20:18:00.123Z",
+  "error": null
+}
+```
+
+**Note:** This endpoint requires authentication. The `lastSyncTime` is the most recent `eventTimestamp` from all app usage events submitted by the user.
+
 ## Summary
 
 1. **Remove `duration` field** - It's not part of the API model
 2. **Wrap in batch format** - Use `syncTime` at top level and `events` array
 3. **Submit both events** - Need `MOVE_TO_FOREGROUND` + `MOVE_TO_BACKGROUND` to calculate usage time
 4. **Usage time is calculated** - Automatically from event timestamps, not from a duration field
+5. **Get last sync time** - Use `/api/usage/stats/last-sync` to get the most recent event timestamp
 

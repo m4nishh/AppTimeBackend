@@ -205,3 +205,13 @@ data class DailyUsageStatsWithSessionResponse(
     val session: TOTPVerificationSessionInfo
 )
 
+/**
+ * Response for last sync time of app usage stats
+ */
+@Serializable
+data class AppUsageLastSyncResponse(
+    val userId: String,
+    val lastSyncTime: String?, // ISO 8601 format, null if no events submitted yet
+    val hasEvents: Boolean // true if user has submitted any app usage events
+)
+

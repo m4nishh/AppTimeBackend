@@ -178,6 +178,27 @@ fun Application.configureChallengeRoutes() {
                         call.respondError(HttpStatusCode.InternalServerError, "Failed to retrieve challenge rankings: ${e.message}")
                     }
                 }
+                
+                /**
+                 * GET /api/challenges/{challengeId}/last-sync
+                 * Get last sync time for the authenticated user in a specific challenge (requires authentication)
+                 * Path parameter: challengeId
+                 * Returns: Last sync time (endSyncTime of most recent stat submission) or null if no stats submitted
+                 */
+                get("/{challengeId}/last-sync") {
+                    try {
+                        val userId = call.requireUserId()
+                        val challengeId = call.parameters["challengeId"]?.toLongOrNull()
+                            ?: throw IllegalArgumentException("Invalid challenge ID")
+                        
+                        val response = service.getLastSyncTime(userId, challengeId)
+                        call.respondApi(response, "Last sync time retrieved successfully")
+                    } catch (e: IllegalArgumentException) {
+                        call.respondError(HttpStatusCode.BadRequest, e.message ?: "Invalid request")
+                    } catch (e: Exception) {
+                        call.respondError(HttpStatusCode.InternalServerError, "Failed to retrieve last sync time: ${e.message}")
+                    }
+                }
             }
         }
     }

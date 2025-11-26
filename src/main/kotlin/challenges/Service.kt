@@ -103,15 +103,16 @@ class ChallengeService(
             throw IllegalArgumentException("endSyncTime must be after startSyncTime")
         }
         
-        // Validate duration matches time difference (allow 1 second difference)
-        val calculatedDuration = endSyncTime.toEpochMilliseconds() - startSyncTime.toEpochMilliseconds()
-        if (kotlin.math.abs(calculatedDuration - request.duration) > 1000) {
-            throw IllegalArgumentException("duration does not match the difference between startSyncTime and endSyncTime")
-        }
-        
         // Validate duration is positive
         if (request.duration <= 0) {
             throw IllegalArgumentException("duration must be greater than 0")
+        }
+        
+        // Validate duration doesn't exceed the time window
+        // The duration represents actual app usage time within the sync window
+        val syncWindowDuration = endSyncTime.toEpochMilliseconds() - startSyncTime.toEpochMilliseconds()
+        if (request.duration > syncWindowDuration) {
+            throw IllegalArgumentException("duration cannot exceed the time difference between startSyncTime and endSyncTime")
         }
         
         // Submit stats
@@ -152,6 +153,30 @@ class ChallengeService(
         return ChallengeStatsSubmissionResponse(
             submitted = stats.size,
             totalDuration = totalDuration
+        )
+    }
+    
+    /**
+     * Get last sync time for a user in a challenge
+     */
+    suspend fun getLastSyncTime(userId: String, challengeId: Long): ChallengeLastSyncResponse {
+        // Validate that user has joined the challenge
+        if (!repository.hasUserJoinedChallenge(userId, challengeId)) {
+            throw IllegalArgumentException("User has not joined this challenge")
+        }
+        
+        // Validate challenge exists
+        repository.getChallengeById(challengeId)
+            ?: throw IllegalArgumentException("Challenge not found")
+        
+        val lastSyncTime = repository.getLastSyncTime(userId, challengeId)
+        val hasStats = repository.hasUserSubmittedStats(userId, challengeId)
+        
+        return ChallengeLastSyncResponse(
+            challengeId = challengeId,
+            userId = userId,
+            lastSyncTime = lastSyncTime,
+            hasStats = hasStats
         )
     }
     

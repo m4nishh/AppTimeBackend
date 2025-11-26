@@ -21,6 +21,7 @@ fun Application.configureAppUsageEventRoutes() {
     
     val statsRepository = UsageStatsRepository()
     val statsService = UsageStatsService(statsRepository)
+    val eventStatsService = AppUsageEventStatsService(repository)
     
     routing {
         route("/api/usage/events") {
@@ -201,6 +202,21 @@ fun Application.configureAppUsageEventRoutes() {
                         )
                     } catch (e: Exception) {
                         call.respondError(HttpStatusCode.InternalServerError, "Failed to get raw events: ${e.message}")
+                    }
+                }
+                
+                /**
+                 * GET /api/usage/stats/last-sync
+                 * Get the last sync time for app usage stats (requires authentication)
+                 * Returns the most recent eventTimestamp from app_usage_events table
+                 */
+                get("/last-sync") {
+                    try {
+                        val userId = call.requireUserId()
+                        val response = eventStatsService.getLastSyncTime(userId)
+                        call.respondApi(response, "Last sync time retrieved successfully")
+                    } catch (e: Exception) {
+                        call.respondError(HttpStatusCode.InternalServerError, "Failed to retrieve last sync time: ${e.message}")
                     }
                 }
             }

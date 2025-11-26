@@ -33,19 +33,50 @@ curl -X GET "http://localhost:8080/api/challenges/active" \
     "challenges": [
       {
         "id": 1,
-        "title": "Reduce Screen Time Challenge",
-        "description": "Reduce your daily screen time by 30%",
-        "reward": "Premium Badge",
+        "title": "Digital Detox Challenge",
+        "description": "Reduce your daily screen time by 30% over the next 2 weeks",
+        "reward": "Digital Wellness Badge + Premium Features (1 month)",
+        "prize": "<div><strong>Rank 1:</strong> 100 points</div><div><strong>Rank 2:</strong> 50 points</div><div><strong>Rank 3:</strong> 10 points</div>",
+        "rules": "<div><strong>Rules:</strong></div><ul><li>Track your screen time daily</li><li>Reduce usage by at least 30% from baseline</li></ul>",
+        "displayType": "FEATURE",
+        "tags": ["social media", "wellness"],
+        "sponsor": "AppTime",
         "startTime": "2024-01-15T00:00:00Z",
         "endTime": "2024-01-31T23:59:59Z",
-        "thumbnail": "https://example.com/thumbnails/challenge1.jpg",
+        "thumbnail": "https://fastly.picsum.photos/id/866/200/300.jpg?hmac=rcadCENKh4rD6MAp6V_ma-AyWv641M4iiOpe1RyFHeI",
+        "packageNames": null,
+        "participantCount": 150,
         "hasJoined": true
+      },
+      {
+        "id": 2,
+        "title": "Chrome Less Usage Challenge",
+        "description": "Reduce your Chrome browser usage by 50% this week",
+        "reward": "Browser Break Badge + Focus Extension (1 month)",
+        "prize": "<div><strong>Rank 1:</strong> 100 points</div><div><strong>Rank 2:</strong> 50 points</div><div><strong>Rank 3:</strong> 10 points</div>",
+        "rules": "<div><strong>Rules:</strong></div><ul><li>Track Chrome usage daily</li><li>Reduce by at least 50%</li></ul>",
+        "displayType": "TRENDING",
+        "tags": ["browser", "wellness"],
+        "sponsor": "BrowserGuard",
+        "startTime": "2024-01-15T00:00:00Z",
+        "endTime": "2024-01-22T23:59:59Z",
+        "thumbnail": "https://fastly.picsum.photos/id/866/200/300.jpg?hmac=rcadCENKh4rD6MAp6V_ma-AyWv641M4iiOpe1RyFHeI",
+        "packageNames": "com.android.chrome,com.google.android.apps.chrome",
+        "participantCount": 75,
+        "hasJoined": false
       }
     ]
   },
   "message": "Active challenges retrieved successfully"
 }
 ```
+
+**Response Fields:**
+- `displayType`: Challenge display type - can be `SPECIAL`, `TRENDING`, `QUICK_JOIN`, or `FEATURE` (nullable)
+- `tags`: Array of challenge tags - can include `browser`, `study`, `gaming`, `social media`, `wellness`, `productivity`, `learning`, etc. (empty array if no tags)
+- `packageNames`: Comma-separated package names for app-specific challenges (null for all apps)
+- `participantCount`: Number of users who have joined this challenge (integer, default: 0)
+- `hasJoined`: Boolean indicating if the authenticated user has joined this challenge (only present when authenticated)
 
 ---
 
@@ -156,13 +187,19 @@ curl -X GET "http://localhost:8080/api/challenges/1" \
   "status": 200,
   "data": {
     "id": 1,
-    "title": "Reduce Screen Time Challenge",
-    "description": "Reduce your daily screen time by 30%",
-    "reward": "Premium Badge",
+    "title": "Digital Detox Challenge",
+    "description": "Reduce your daily screen time by 30% over the next 2 weeks",
+    "reward": "Digital Wellness Badge + Premium Features (1 month)",
+    "prize": "<div><strong>Rank 1:</strong> 100 points</div><div><strong>Rank 2:</strong> 50 points</div><div><strong>Rank 3:</strong> 10 points</div>",
+    "rules": "<div><strong>Rules:</strong></div><ul><li>Track your screen time daily</li><li>Reduce usage by at least 30% from baseline</li></ul>",
+    "displayType": "FEATURE",
+    "tags": ["social media", "wellness"],
+    "sponsor": "AppTime",
     "startTime": "2024-01-15T00:00:00Z",
     "endTime": "2024-01-31T23:59:59Z",
-    "thumbnail": "https://example.com/thumbnails/challenge1.jpg",
+    "thumbnail": "https://fastly.picsum.photos/id/866/200/300.jpg?hmac=rcadCENKh4rD6MAp6V_ma-AyWv641M4iiOpe1RyFHeI",
     "challengeType": "LESS_SCREENTIME",
+    "packageNames": null,
     "isActive": true,
     "participantCount": 150,
     "createdAt": "2024-01-10T12:00:00Z"
@@ -170,6 +207,11 @@ curl -X GET "http://localhost:8080/api/challenges/1" \
   "message": "Challenge details retrieved successfully"
 }
 ```
+
+**Response Fields:**
+- `displayType`: Challenge display type - `SPECIAL`, `TRENDING`, `QUICK_JOIN`, or `FEATURE` (nullable)
+- `tags`: Array of challenge tags like `browser`, `study`, `gaming`, `social media`, `wellness`, `productivity`, `learning` (empty array if no tags)
+- `packageNames`: Comma-separated package names for app-specific challenges (null for all apps)
 
 ---
 
@@ -487,6 +529,80 @@ curl -X GET "http://localhost:8080/api/challenges/user" \
 
 ---
 
+## 8. Get Last Sync Time
+
+Get the last sync time for the authenticated user in a specific challenge. This returns the most recent `endSyncTime` from the user's challenge stats submissions.
+
+**Endpoint:** `GET /api/challenges/{challengeId}/last-sync`  
+**Authentication:** Required
+
+```bash
+curl -X GET "http://localhost:8080/api/challenges/1/last-sync" \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer YOUR_AUTH_TOKEN"
+```
+
+**Response Example (with stats):**
+```json
+{
+  "success": true,
+  "status": 200,
+  "data": {
+    "challengeId": 1,
+    "userId": "user123",
+    "lastSyncTime": "2024-01-20T15:30:00Z",
+    "hasStats": true
+  },
+  "message": "Last sync time retrieved successfully"
+}
+```
+
+**Response Example (no stats submitted yet):**
+```json
+{
+  "success": true,
+  "status": 200,
+  "data": {
+    "challengeId": 1,
+    "userId": "user123",
+    "lastSyncTime": null,
+    "hasStats": false
+  },
+  "message": "Last sync time retrieved successfully"
+}
+```
+
+**Note:**
+- `lastSyncTime` is the `endSyncTime` of the most recent stat submission for this user in this challenge
+- Returns `null` if the user hasn't submitted any stats yet
+- `hasStats` indicates whether the user has submitted any stats for this challenge
+- User must have joined the challenge first
+
+---
+
+## Challenge Display Types
+
+The `displayType` field categorizes challenges for better organization and filtering:
+
+- **SPECIAL**: Special featured challenges (e.g., Focus Mode Marathon, Deep Work Challenge)
+- **TRENDING**: Currently trending challenges (e.g., Productivity Power Hour, Social Media Detox Week)
+- **QUICK_JOIN**: Quick join challenges - short duration, easy to start (e.g., Weekend Warrior, Evening Unplug)
+- **FEATURE**: Featured challenges (e.g., Digital Detox Challenge, 30-Day Learning Streak)
+
+## Challenge Tags
+
+The `tags` field allows multiple tags per challenge for better categorization:
+
+- **browser**: Browser-related challenges (e.g., Chrome usage reduction)
+- **study**: Study and learning challenges (e.g., 30-Day Learning Streak)
+- **gaming**: Gaming-related challenges
+- **social media**: Social media usage challenges (e.g., Social Media Detox Week)
+- **wellness**: Wellness and health challenges (e.g., Digital Detox, Minimal Phone Usage)
+- **productivity**: Productivity-focused challenges (e.g., Productivity Power Hour, Deep Work)
+- **learning**: Educational and learning challenges
+
+A challenge can have multiple tags (e.g., `["browser", "wellness"]` or `["study", "productivity"]`).
+
 ## Notes
 
 1. **Time Format**: All timestamps use ISO 8601 format (e.g., `2024-01-20T10:30:00Z`)
@@ -494,6 +610,8 @@ curl -X GET "http://localhost:8080/api/challenges/user" \
 3. **Challenge Types**:
    - `LESS_SCREENTIME`: Lower total duration = better rank
    - `MORE_SCREENTIME`: Higher total duration = better rank
-4. **Authentication**: Most endpoints require a valid JWT Bearer token
-5. **Participant Stats**: The system tracks app usage with appName, packageName, startSyncTime, endSyncTime, and duration
+4. **Display Types**: `SPECIAL`, `TRENDING`, `QUICK_JOIN`, `FEATURE` (nullable)
+5. **Tags**: Array of strings, can be empty `[]` if no tags assigned
+6. **Authentication**: Most endpoints require a valid JWT Bearer token
+7. **Participant Stats**: The system tracks app usage with appName, packageName, startSyncTime, endSyncTime, and duration
 

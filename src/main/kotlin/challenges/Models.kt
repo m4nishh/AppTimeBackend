@@ -11,6 +11,17 @@ enum class ChallengeType {
 }
 
 /**
+ * Challenge display type enum - predefined types for challenges
+ */
+@Serializable
+enum class ChallengeDisplayType {
+    SPECIAL,      // Special featured challenges
+    TRENDING,     // Currently trending challenges
+    QUICK_JOIN,   // Quick join challenges (short duration, easy to start)
+    FEATURE       // Featured challenges
+}
+
+/**
  * Challenge data model
  */
 @Serializable
@@ -36,9 +47,16 @@ data class ActiveChallenge(
     val title: String,
     val description: String? = null,
     val reward: String? = null,
+    val prize: String? = null, // HTML string with rank-based prizes
+    val rules: String? = null, // HTML string with challenge rules
+    val displayType: String? = null, // Challenge display type (SPECIAL, TRENDING, QUICK_JOIN, FEATURE)
+    val tags: List<String> = emptyList(), // Challenge tags (browser, study, gaming, social media, etc.)
+    val sponsor: String? = null, // Challenge sponsor name
     val startTime: String,
     val endTime: String,
     val thumbnail: String? = null,
+    val packageNames: String? = null, // Comma-separated package names
+    val participantCount: Int = 0, // Number of participants who joined this challenge
     val hasJoined: Boolean = false
 )
 
@@ -104,10 +122,16 @@ data class ChallengeDetail(
     val title: String,
     val description: String? = null,
     val reward: String? = null,
+    val prize: String? = null, // HTML string with rank-based prizes
+    val rules: String? = null, // HTML string with challenge rules
+    val displayType: String? = null, // Challenge display type (SPECIAL, TRENDING, QUICK_JOIN, FEATURE)
+    val tags: List<String> = emptyList(), // Challenge tags (browser, study, gaming, social media, etc.)
+    val sponsor: String? = null, // Challenge sponsor name
     val startTime: String,
     val endTime: String,
     val thumbnail: String? = null,
     val challengeType: String,
+    val packageNames: String? = null, // Comma-separated package names
     val isActive: Boolean,
     val participantCount: Int,
     val createdAt: String? = null
@@ -166,5 +190,16 @@ data class ChallengeRankResponse(
     val rankings: List<ChallengeRankEntry>,
     val userRank: ChallengeRankEntry? = null, // Current user's rank if they're participating
     val totalParticipants: Int
+)
+
+/**
+ * Response for last sync time
+ */
+@Serializable
+data class ChallengeLastSyncResponse(
+    val challengeId: Long,
+    val userId: String,
+    val lastSyncTime: String?, // ISO 8601 format, null if no stats submitted yet
+    val hasStats: Boolean // true if user has submitted any stats for this challenge
 )
 

@@ -27,6 +27,9 @@ object Users : Table("users") {
     val totpSecret = varchar("totp_secret", 255).nullable()
     val totpEnabled = bool("totp_enabled").default(true)
 
+    // Firebase
+    val firebaseToken = text("firebase_token").nullable() // Firebase Cloud Messaging (FCM) token for push notifications
+
     // Timestamps
     val createdAt = timestamp("created_at").clientDefault { kotlinx.datetime.Clock.System.now() }
     val updatedAt = timestamp("updated_at").clientDefault { kotlinx.datetime.Clock.System.now() }

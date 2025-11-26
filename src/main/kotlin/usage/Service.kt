@@ -152,3 +152,22 @@ class UsageStatsService(
     }
 }
 
+/**
+ * Service for app usage event operations
+ */
+class AppUsageEventStatsService(
+    private val repository: AppUsageEventRepository
+) {
+    /**
+     * Get the last sync time for app usage stats
+     */
+    suspend fun getLastSyncTime(userId: String): AppUsageLastSyncResponse {
+        val lastSyncTime = repository.getLastSyncTime(userId)
+        return AppUsageLastSyncResponse(
+            userId = userId,
+            lastSyncTime = lastSyncTime?.toString(),
+            hasEvents = lastSyncTime != null
+        )
+    }
+}
+
