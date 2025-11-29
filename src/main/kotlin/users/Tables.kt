@@ -27,6 +27,9 @@ object Users : Table("users") {
     val totpSecret = varchar("totp_secret", 255).nullable()
     val totpEnabled = bool("totp_enabled").default(true)
 
+    // User status
+    val isBlocked = bool("is_blocked").default(false)
+
     // Firebase
     val firebaseToken = text("firebase_token").nullable() // Firebase Cloud Messaging (FCM) token for push notifications
 

@@ -72,6 +72,7 @@ data class AdminUserResponse(
     val manufacturer: String? = null,
     val androidVersion: String? = null,
     val totpEnabled: Boolean,
+    val isBlocked: Boolean,
     val createdAt: String,
     val lastSyncTime: String? = null
 )
@@ -81,7 +82,8 @@ data class UpdateUserRequest(
     val username: String? = null,
     val email: String? = null,
     val name: String? = null,
-    val totpEnabled: Boolean? = null
+    val totpEnabled: Boolean? = null,
+    val isBlocked: Boolean? = null
 )
 
 // Consent Template Management Models
@@ -106,5 +108,27 @@ data class AdminConsentTemplateResponse(
     val description: String? = null,
     val isMandatory: Boolean,
     val userCount: Long // Number of users who have submitted this consent
+)
+
+// Admin Authentication Models
+@Serializable
+data class AdminLoginRequest(
+    val username: String,
+    val password: String
+)
+
+@Serializable
+data class AdminLoginResponse(
+    val token: String
+)
+
+@Serializable
+data class AdminVerifyRequest(
+    val token: String
+)
+
+@Serializable
+data class AdminVerifyResponse(
+    val valid: Boolean
 )
 

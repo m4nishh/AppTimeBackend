@@ -18,7 +18,7 @@ fun Application.configureAuthentication() {
             authenticate { tokenCredential ->
                 // The token is the encrypted userId
                 val userId = tokenCredential.token
-                if (userId.isNotBlank() && userRepository.userExists(userId)) {
+                if (userId.isNotBlank() && userRepository.userExists(userId) && !userRepository.isUserBlocked(userId)) {
                     UserIdPrincipal(userId)
                 } else {
                     null

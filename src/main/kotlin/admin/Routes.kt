@@ -1,11 +1,13 @@
 package com.apptime.code.admin
 
+import com.apptime.code.common.EnvLoader
 import com.apptime.code.common.respondApi
 import com.apptime.code.common.respondError
 import io.ktor.http.*
 import io.ktor.server.application.*
 import io.ktor.server.request.*
 import io.ktor.server.routing.*
+import java.util.*
 
 /**
  * Configure admin-related routes
@@ -17,6 +19,49 @@ fun Application.configureAdminRoutes() {
     
     routing {
         route("/api/admin") {
+            /**
+             * POST /api/admin/login
+             * Admin login endpoint
+             */
+            post("/login") {
+                try {
+                    val request = call.receive<AdminLoginRequest>()
+                    val adminUsername = EnvLoader.getEnv("ADMIN_USERNAME", "admin")
+                    val adminPassword = EnvLoader.getEnv("ADMIN_PASSWORD", "admin123")
+                    
+                    if (request.username == adminUsername && request.password == adminPassword) {
+                        // Generate a simple session token
+                        val sessionToken = UUID.randomUUID().toString()
+                        val loginResponse = AdminLoginResponse(token = sessionToken)
+                        call.respondApi(loginResponse, "Login successful")
+                    } else {
+                        call.respondError(HttpStatusCode.Unauthorized, "Invalid username or password")
+                    }
+                } catch (e: Exception) {
+                    call.respondError(HttpStatusCode.BadRequest, "Invalid request: ${e.message}")
+                }
+            }
+            
+            /**
+             * POST /api/admin/verify
+             * Verify admin session token
+             */
+            post("/verify") {
+                try {
+                    val request = call.receive<AdminVerifyRequest>()
+                    // For simplicity, we'll accept any non-empty token
+                    // In production, you should validate tokens properly
+                    if (request.token.isNotBlank()) {
+                        val verifyResponse = AdminVerifyResponse(valid = true)
+                        call.respondApi(verifyResponse, "Token is valid")
+                    } else {
+                        call.respondError(HttpStatusCode.Unauthorized, "Invalid token")
+                    }
+                } catch (e: Exception) {
+                    call.respondError(HttpStatusCode.BadRequest, "Invalid request: ${e.message}")
+                }
+            }
+            
             /**
              * GET /api/admin/stats
              * Get comprehensive admin statistics
@@ -162,6 +207,44 @@ fun Application.configureAdminRoutes() {
                         call.respondError(HttpStatusCode.BadRequest, e.message ?: "Invalid request")
                     } catch (e: Exception) {
                         call.respondError(HttpStatusCode.InternalServerError, "Failed to update user: ${e.message}")
+                    }
+                }
+                
+                // Block user
+                post("/{userId}/block") {
+                    try {
+                        val userId = call.parameters["userId"]
+                            ?: throw IllegalArgumentException("Invalid user ID")
+                        val blocked = adminRepository.blockUser(userId)
+                        if (blocked) {
+                            val user = adminRepository.getUserById(userId)
+                            call.respondApi(user, "User blocked successfully")
+                        } else {
+                            call.respondError(HttpStatusCode.NotFound, "User not found")
+                        }
+                    } catch (e: IllegalArgumentException) {
+                        call.respondError(HttpStatusCode.BadRequest, e.message ?: "Invalid request")
+                    } catch (e: Exception) {
+                        call.respondError(HttpStatusCode.InternalServerError, "Failed to block user: ${e.message}")
+                    }
+                }
+                
+                // Unblock user
+                post("/{userId}/unblock") {
+                    try {
+                        val userId = call.parameters["userId"]
+                            ?: throw IllegalArgumentException("Invalid user ID")
+                        val unblocked = adminRepository.unblockUser(userId)
+                        if (unblocked) {
+                            val user = adminRepository.getUserById(userId)
+                            call.respondApi(user, "User unblocked successfully")
+                        } else {
+                            call.respondError(HttpStatusCode.NotFound, "User not found")
+                        }
+                    } catch (e: IllegalArgumentException) {
+                        call.respondError(HttpStatusCode.BadRequest, e.message ?: "Invalid request")
+                    } catch (e: Exception) {
+                        call.respondError(HttpStatusCode.InternalServerError, "Failed to unblock user: ${e.message}")
                     }
                 }
                 

@@ -57,6 +57,11 @@ class UserRepository {
             }.firstOrNull()
 
             if (existingUser != null) {
+                // Check if user is blocked
+                if (existingUser[Users.isBlocked]) {
+                    throw IllegalArgumentException("User account is blocked")
+                }
+                
                 // User already exists, return existing data
                 val existingUserId = existingUser[Users.userId]
                 val username = existingUser[Users.username]
@@ -157,6 +162,17 @@ class UserRepository {
     fun userExists(userId: String): Boolean {
         return dbTransaction {
             Users.select { Users.userId eq userId }.count() > 0
+        }
+    }
+    
+    /**
+     * Check if user is blocked
+     */
+    fun isUserBlocked(userId: String): Boolean {
+        return dbTransaction {
+            Users.select { Users.userId eq userId }
+                .firstOrNull()
+                ?.let { row -> row[Users.isBlocked] } ?: false
         }
     }
     

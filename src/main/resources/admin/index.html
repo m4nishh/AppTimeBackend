@@ -346,9 +346,20 @@
             color: white;
         }
 
+        .badge.blocked {
+            background: #ef4444;
+            color: white;
+        }
+
+        .badge.unblocked {
+            background: #10b981;
+            color: white;
+        }
+
         .actions {
             display: flex;
             gap: 8px;
+            flex-wrap: wrap;
         }
 
         @media (max-width: 768px) {
@@ -362,24 +373,78 @@
                 font-size: 0.85em;
             }
         }
+        .login-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.7);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 2000;
+        }
+
+        .login-container {
+            background: white;
+            border-radius: 12px;
+            padding: 40px;
+            max-width: 400px;
+            width: 90%;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+        }
+
+        .login-container h2 {
+            margin-bottom: 20px;
+            color: #333;
+            text-align: center;
+        }
+
+        .hidden {
+            display: none !important;
+        }
     </style>
 </head>
 <body>
-    <div class="container">
-        <div class="header">
-            <h1>📊 AppTime Backend Admin Dashboard</h1>
-            <p>Manage users, challenges, and consent templates</p>
+    <!-- Login Overlay -->
+    <div id="loginOverlay" class="login-overlay">
+        <div class="login-container">
+            <h2>🔐 Admin Login</h2>
+            <form id="loginForm" onsubmit="handleLogin(event)">
+                <div class="form-group">
+                    <label>Username</label>
+                    <input type="text" id="loginUsername" required autofocus>
+                </div>
+                <div class="form-group">
+                    <label>Password</label>
+                    <input type="password" id="loginPassword" required>
+                </div>
+                <div id="login-error" class="error" style="display: none; margin-bottom: 15px;"></div>
+                <div class="form-actions">
+                    <button type="submit" class="btn btn-primary" style="width: 100%;">Login</button>
+                </div>
+            </form>
         </div>
+    </div>
 
-        <div class="tabs">
-            <button class="tab active" onclick="showTab('dashboard')">📈 Dashboard</button>
-            <button class="tab" onclick="showTab('challenges')">🏆 Challenges</button>
-            <button class="tab" onclick="showTab('users')">👥 Users</button>
-            <button class="tab" onclick="showTab('consents')">📝 Consents</button>
-        </div>
+    <div id="dashboardContent" class="hidden">
+        <div class="container">
+            <div class="header">
+                <h1>📊 AppTime Backend Admin Dashboard</h1>
+                <p>Manage users, challenges, and consent templates</p>
+                <button class="btn btn-secondary" onclick="logout()" style="margin-top: 10px;">Logout</button>
+            </div>
 
-        <div id="error-message" class="error" style="display: none;"></div>
-        <div id="success-message" class="success" style="display: none;"></div>
+            <div class="tabs">
+                <button class="tab active" onclick="showTab('dashboard')">📈 Dashboard</button>
+                <button class="tab" onclick="showTab('challenges')">🏆 Challenges</button>
+                <button class="tab" onclick="showTab('users')">👥 Users</button>
+                <button class="tab" onclick="showTab('consents')">📝 Consents</button>
+            </div>
+
+            <div id="error-message" class="error" style="display: none;"></div>
+            <div id="success-message" class="success" style="display: none;"></div>
 
         <!-- Dashboard Tab -->
         <div id="dashboard" class="tab-content active">
@@ -418,6 +483,7 @@
                 </div>
                 <div id="consents-content" class="loading">Loading consent templates...</div>
             </div>
+        </div>
         </div>
     </div>
 
@@ -534,10 +600,163 @@
         </div>
     </div>
 
+    <!-- User Modal -->
+    <div id="userModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="userModalTitle">Edit User</h3>
+                <button class="close" onclick="closeUserModal()">&times;</button>
+            </div>
+            <form id="userForm" onsubmit="saveUser(event)">
+                <input type="hidden" id="userId">
+                <div class="form-group">
+                    <label>User ID</label>
+                    <input type="text" id="userUserId" disabled style="background: #f5f5f5;">
+                </div>
+                <div class="form-group">
+                    <label>Username</label>
+                    <input type="text" id="userUsername">
+                </div>
+                <div class="form-group">
+                    <label>Email</label>
+                    <input type="email" id="userEmail">
+                </div>
+                <div class="form-group">
+                    <label>Name</label>
+                    <input type="text" id="userName">
+                </div>
+                <div class="form-group">
+                    <label>Device ID</label>
+                    <input type="text" id="userDeviceId" disabled style="background: #f5f5f5;">
+                </div>
+                <div class="form-group">
+                    <label>Device Model</label>
+                    <input type="text" id="userDeviceModel" disabled style="background: #f5f5f5;">
+                </div>
+                <div class="form-group">
+                    <label>
+                        <input type="checkbox" id="userTotpEnabled"> TOTP Enabled
+                    </label>
+                </div>
+                <div class="form-group">
+                    <label>
+                        <input type="checkbox" id="userIsBlocked"> User is Blocked
+                    </label>
+                </div>
+                <div class="form-actions">
+                    <button type="button" class="btn btn-secondary" onclick="closeUserModal()">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Save</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
     <script>
         const API_BASE = window.location.origin;
+        const ADMIN_TOKEN_KEY = 'admin_token';
         let currentEditingChallenge = null;
         let currentEditingConsent = null;
+        let currentEditingUser = null;
+
+        // Authentication Functions
+        function getAdminToken() {
+            return localStorage.getItem(ADMIN_TOKEN_KEY);
+        }
+
+        function setAdminToken(token) {
+            localStorage.setItem(ADMIN_TOKEN_KEY, token);
+        }
+
+        function removeAdminToken() {
+            localStorage.removeItem(ADMIN_TOKEN_KEY);
+        }
+
+        function isAuthenticated() {
+            return getAdminToken() !== null;
+        }
+
+        async function verifyToken() {
+            const token = getAdminToken();
+            if (!token) return false;
+            
+            try {
+                const response = await fetch(`${API_BASE}/api/admin/verify`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ token: token })
+                });
+                const result = await response.json();
+                return result.success && result.data?.valid === true;
+            } catch (err) {
+                console.error('Token verification failed:', err);
+                return false;
+            }
+        }
+
+        async function handleLogin(event) {
+            event.preventDefault();
+            const username = document.getElementById('loginUsername').value;
+            const password = document.getElementById('loginPassword').value;
+            const errorDiv = document.getElementById('login-error');
+            
+            errorDiv.style.display = 'none';
+            
+            try {
+                const response = await fetch(`${API_BASE}/api/admin/login`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username, password })
+                });
+                const result = await response.json();
+                
+                if (result.success && result.data?.token) {
+                    setAdminToken(result.data.token);
+                    showDashboard();
+                } else {
+                    errorDiv.textContent = result.message || 'Invalid username or password';
+                    errorDiv.style.display = 'block';
+                }
+            } catch (err) {
+                errorDiv.textContent = `Error: ${err.message}`;
+                errorDiv.style.display = 'block';
+            }
+        }
+
+        function showDashboard() {
+            document.getElementById('loginOverlay').classList.add('hidden');
+            document.getElementById('dashboardContent').classList.remove('hidden');
+            // Load initial data after authentication
+            loadStats();
+        }
+
+        function showLogin() {
+            document.getElementById('loginOverlay').classList.remove('hidden');
+            document.getElementById('dashboardContent').classList.add('hidden');
+            removeAdminToken();
+        }
+
+        function logout() {
+            if (confirm('Are you sure you want to logout?')) {
+                showLogin();
+            }
+        }
+
+        // Check authentication on page load
+        async function checkAuth() {
+            if (isAuthenticated()) {
+                const isValid = await verifyToken();
+                if (isValid) {
+                    showDashboard();
+                } else {
+                    showLogin();
+                }
+            } else {
+                showLogin();
+            }
+        }
+
+        // Initialize on page load
+        checkAuth();
 
         function showTab(tabName) {
             document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
@@ -764,9 +983,12 @@
                 const result = await response.json();
                 if (result.success && result.data) {
                     displayUsers(result.data);
+                } else {
+                    showMessage(result.message || 'Failed to load users');
                 }
             } catch (err) {
                 showMessage(`Error loading users: ${err.message}`);
+                console.error('Error loading users:', err);
             }
         }
 
@@ -775,6 +997,12 @@
                 document.getElementById('users-content').innerHTML = '<p>No users found.</p>';
                 return;
             }
+            
+            // Debug: log first user to see structure
+            if (users.length > 0) {
+                console.log('Sample user data:', users[0]);
+            }
+            
             const html = `
                 <table>
                     <thead>
@@ -783,28 +1011,111 @@
                             <th>Username</th>
                             <th>Email</th>
                             <th>Device Model</th>
+                            <th>Status</th>
                             <th>Created</th>
                             <th>Actions</th>
                         </tr>
                     </thead>
                     <tbody>
-                        ${users.map(u => `
+                        ${users.map(u => {
+                            // Handle isBlocked field - default to false if not present
+                            // Check for true, 'true', 1, or any truthy value
+                            const isBlocked = !!(u.isBlocked === true || u.isBlocked === 'true' || u.isBlocked === 1 || (u.hasOwnProperty('isBlocked') && u.isBlocked));
+                            
+                            // Always show a button - Block for active users, Unblock for blocked users
+                            let blockButtonHtml = '';
+                            if (isBlocked) {
+                                blockButtonHtml = `<button class="btn btn-success btn-sm" onclick="unblockUser('${u.userId}')">Unblock</button>`;
+                            } else {
+                                blockButtonHtml = `<button class="btn btn-danger btn-sm" onclick="blockUser('${u.userId}')">Block</button>`;
+                            }
+                            
+                            return `
                             <tr>
                                 <td>${u.userId.substring(0, 20)}...</td>
                                 <td>${u.username || 'N/A'}</td>
                                 <td>${u.email || 'N/A'}</td>
                                 <td>${u.deviceModel || 'N/A'}</td>
+                                <td><span class="badge ${isBlocked ? 'blocked' : 'unblocked'}">${isBlocked ? 'Blocked' : 'Active'}</span></td>
                                 <td>${new Date(u.createdAt).toLocaleDateString()}</td>
                                 <td class="actions">
                                     <button class="btn btn-primary btn-sm" onclick="editUser('${u.userId}')">Edit</button>
+                                    ${blockButtonHtml}
                                     <button class="btn btn-danger btn-sm" onclick="deleteUser('${u.userId}')">Delete</button>
                                 </td>
                             </tr>
-                        `).join('')}
+                            `;
+                        }).join('')}
                     </tbody>
                 </table>
             `;
             document.getElementById('users-content').innerHTML = html;
+        }
+
+        function showUserModal(user = null) {
+            currentEditingUser = user;
+            const modal = document.getElementById('userModal');
+            const form = document.getElementById('userForm');
+            const title = document.getElementById('userModalTitle');
+            
+            if (user) {
+                title.textContent = 'Edit User';
+                document.getElementById('userId').value = user.userId;
+                document.getElementById('userUserId').value = user.userId;
+                document.getElementById('userUsername').value = user.username || '';
+                document.getElementById('userEmail').value = user.email || '';
+                document.getElementById('userName').value = user.name || '';
+                document.getElementById('userDeviceId').value = user.deviceId || '';
+                document.getElementById('userDeviceModel').value = user.deviceModel || '';
+                document.getElementById('userTotpEnabled').checked = user.totpEnabled || false;
+                document.getElementById('userIsBlocked').checked = user.isBlocked || false;
+            } else {
+                title.textContent = 'Edit User';
+                form.reset();
+                document.getElementById('userId').value = '';
+            }
+            modal.classList.add('active');
+        }
+
+        function closeUserModal() {
+            document.getElementById('userModal').classList.remove('active');
+            currentEditingUser = null;
+        }
+
+        async function saveUser(event) {
+            event.preventDefault();
+            const userId = document.getElementById('userId').value;
+            if (!userId) {
+                showMessage('User ID is required');
+                return;
+            }
+            
+            const data = {
+                username: document.getElementById('userUsername').value || null,
+                email: document.getElementById('userEmail').value || null,
+                name: document.getElementById('userName').value || null,
+                totpEnabled: document.getElementById('userTotpEnabled').checked,
+                isBlocked: document.getElementById('userIsBlocked').checked
+            };
+
+            try {
+                const response = await fetch(`${API_BASE}/api/admin/users/${userId}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+                const result = await response.json();
+                
+                if (result.success) {
+                    showMessage(result.message || 'User updated successfully', 'success');
+                    closeUserModal();
+                    loadUsers();
+                } else {
+                    showMessage(result.message || 'Failed to update user');
+                }
+            } catch (err) {
+                showMessage(`Error: ${err.message}`);
+            }
         }
 
         async function editUser(userId) {
@@ -812,21 +1123,41 @@
                 const response = await fetch(`${API_BASE}/api/admin/users/${userId}`);
                 const result = await response.json();
                 if (result.success && result.data) {
-                    const user = result.data;
-                    const username = prompt('Username:', user.username || '');
-                    const email = prompt('Email:', user.email || '');
-                    const name = prompt('Name:', user.name || '');
-                    const totpEnabled = confirm('TOTP Enabled?', user.totpEnabled);
-                    
-                    if (username !== null) {
-                        await fetch(`${API_BASE}/api/admin/users/${userId}`, {
-                            method: 'PUT',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ username, email, name, totpEnabled })
-                        });
-                        showMessage('User updated successfully', 'success');
-                        loadUsers();
-                    }
+                    showUserModal(result.data);
+                } else {
+                    showMessage(result.message || 'Failed to load user');
+                }
+            } catch (err) {
+                showMessage(`Error: ${err.message}`);
+            }
+        }
+
+        async function blockUser(userId) {
+            if (!confirm('Are you sure you want to block this user? They will not be able to access the system.')) return;
+            try {
+                const response = await fetch(`${API_BASE}/api/admin/users/${userId}/block`, { method: 'POST' });
+                const result = await response.json();
+                if (result.success) {
+                    showMessage('User blocked successfully', 'success');
+                    loadUsers();
+                } else {
+                    showMessage(result.message || 'Failed to block user');
+                }
+            } catch (err) {
+                showMessage(`Error: ${err.message}`);
+            }
+        }
+
+        async function unblockUser(userId) {
+            if (!confirm('Are you sure you want to unblock this user?')) return;
+            try {
+                const response = await fetch(`${API_BASE}/api/admin/users/${userId}/unblock`, { method: 'POST' });
+                const result = await response.json();
+                if (result.success) {
+                    showMessage('User unblocked successfully', 'success');
+                    loadUsers();
+                } else {
+                    showMessage(result.message || 'Failed to unblock user');
                 }
             } catch (err) {
                 showMessage(`Error: ${err.message}`);
@@ -984,8 +1315,6 @@
             }
         }
 
-        // Load initial data
-        loadStats();
     </script>
 </body>
 </html>

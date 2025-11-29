@@ -145,6 +145,7 @@ class AdminRepository {
                         manufacturer = row[Users.manufacturer],
                         androidVersion = row[Users.androidVersion],
                         totpEnabled = row[Users.totpEnabled],
+                        isBlocked = row[Users.isBlocked],
                         createdAt = row[Users.createdAt].toString(),
                         lastSyncTime = row[Users.lastSyncTime]?.toString()
                     )
@@ -167,6 +168,7 @@ class AdminRepository {
                         manufacturer = row[Users.manufacturer],
                         androidVersion = row[Users.androidVersion],
                         totpEnabled = row[Users.totpEnabled],
+                        isBlocked = row[Users.isBlocked],
                         createdAt = row[Users.createdAt].toString(),
                         lastSyncTime = row[Users.lastSyncTime]?.toString()
                     )
@@ -181,6 +183,25 @@ class AdminRepository {
                 request.email?.let { value -> it[Users.email] = value }
                 request.name?.let { value -> it[Users.name] = value }
                 request.totpEnabled?.let { value -> it[Users.totpEnabled] = value }
+                request.isBlocked?.let { value -> it[Users.isBlocked] = value }
+            }
+            updateCount > 0
+        }
+    }
+    
+    fun blockUser(userId: String): Boolean {
+        return dbTransaction {
+            val updateCount = Users.update({ Users.userId eq userId }) {
+                it[Users.isBlocked] = true
+            }
+            updateCount > 0
+        }
+    }
+    
+    fun unblockUser(userId: String): Boolean {
+        return dbTransaction {
+            val updateCount = Users.update({ Users.userId eq userId }) {
+                it[Users.isBlocked] = false
             }
             updateCount > 0
         }
