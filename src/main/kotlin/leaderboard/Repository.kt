@@ -4,6 +4,7 @@ import com.apptime.code.common.dbTransaction
 import com.apptime.code.users.Users
 import org.jetbrains.exposed.sql.*
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
+import org.jetbrains.exposed.sql.SqlExpressionBuilder.inList
 import usage.AppUsageEvents
 import java.time.LocalDate
 import java.time.ZoneId
@@ -282,11 +283,44 @@ class LeaderboardRepository {
         screenTime: Long,
         replace: Boolean = false
     ): String {
-        val existing = LeaderboardStats.select {
+        // First, check if there are any existing entries (handle potential duplicates)
+        val existingEntries = LeaderboardStats.select {
             (LeaderboardStats.userId eq userId) and
             (LeaderboardStats.period eq period) and
             (LeaderboardStats.periodDate eq periodDate)
-        }.firstOrNull()
+        }.toList()
+        
+        // If multiple entries exist (duplicates), merge them first
+        if (existingEntries.size > 1) {
+            val totalTime = existingEntries.sumOf { it[LeaderboardStats.totalScreenTime] }
+            val firstId = existingEntries.first()[LeaderboardStats.id]
+            
+            // Delete all duplicates except the first one
+            val duplicateIds = existingEntries.drop(1).map { it[LeaderboardStats.id] }
+            if (duplicateIds.isNotEmpty()) {
+                LeaderboardStats.deleteWhere {
+                    LeaderboardStats.id inList duplicateIds
+                }
+            }
+            
+            // Update the first entry with merged total
+            val newTotal = if (replace) {
+                screenTime
+            } else {
+                totalTime + screenTime
+            }
+            
+            LeaderboardStats.update({ LeaderboardStats.id eq firstId }) {
+                it[LeaderboardStats.totalScreenTime] = newTotal
+                it[LeaderboardStats.updatedAt] = kotlinx.datetime.Clock.System.now()
+                if (username != null) {
+                    it[LeaderboardStats.username] = username
+                }
+            }
+            return "updated"
+        }
+        
+        val existing = existingEntries.firstOrNull()
         
         return if (existing != null) {
             // Update existing
@@ -309,15 +343,47 @@ class LeaderboardRepository {
             }
             "updated"
         } else {
-            // Insert new
-            LeaderboardStats.insert {
-                it[LeaderboardStats.userId] = userId
-                it[LeaderboardStats.username] = username
-                it[LeaderboardStats.period] = period
-                it[LeaderboardStats.periodDate] = periodDate
-                it[LeaderboardStats.totalScreenTime] = screenTime
+            // Insert new - use insertIgnore to handle race conditions
+            try {
+                LeaderboardStats.insert {
+                    it[LeaderboardStats.userId] = userId
+                    it[LeaderboardStats.username] = username
+                    it[LeaderboardStats.period] = period
+                    it[LeaderboardStats.periodDate] = periodDate
+                    it[LeaderboardStats.totalScreenTime] = screenTime
+                }
+                "created"
+            } catch (e: Exception) {
+                // If insert fails due to unique constraint, update instead
+                val existingAfterInsert = LeaderboardStats.select {
+                    (LeaderboardStats.userId eq userId) and
+                    (LeaderboardStats.period eq period) and
+                    (LeaderboardStats.periodDate eq periodDate)
+                }.firstOrNull()
+                
+                if (existingAfterInsert != null) {
+                    val newTotal = if (replace) {
+                        screenTime
+                    } else {
+                        existingAfterInsert[LeaderboardStats.totalScreenTime] + screenTime
+                    }
+                    
+                    LeaderboardStats.update({
+                        (LeaderboardStats.userId eq userId) and
+                        (LeaderboardStats.period eq period) and
+                        (LeaderboardStats.periodDate eq periodDate)
+                    }) {
+                        it[LeaderboardStats.totalScreenTime] = newTotal
+                        it[LeaderboardStats.updatedAt] = kotlinx.datetime.Clock.System.now()
+                        if (username != null) {
+                            it[LeaderboardStats.username] = username
+                        }
+                    }
+                    "updated"
+                } else {
+                    throw e
+                }
             }
-            "created"
         }
     }
     
