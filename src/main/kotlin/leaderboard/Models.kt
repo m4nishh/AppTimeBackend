@@ -21,3 +21,13 @@ data class LeaderboardResponse(
     val totalUsers: Int
 )
 
+@Serializable
+data class LeaderboardSyncResponse(
+    val message: String,
+    val eventsProcessed: Int,
+    val usersUpdated: Int,
+    val statsCreated: Int,
+    val statsUpdated: Int,
+    val dateSynced: String? = null
+)
+
