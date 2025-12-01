@@ -80,22 +80,23 @@ class UsageStatsRepository {
                     AppUsageEvents.userId eq userId
                 }.orderBy(AppUsageEvents.eventTimestamp to SortOrder.DESC).toList()
 
-                // Extract unique dates from event timestamps
+                // Extract unique dates from event timestamps using IST timezone
+                val istZone = java.time.ZoneId.of("Asia/Kolkata")
                 val uniqueDates = allEvents.map { event ->
                     val timestamp = event[AppUsageEvents.eventTimestamp]
                     val localDate = java.time.Instant.ofEpochMilli(timestamp.toEpochMilliseconds())
-                        .atZone(java.time.ZoneId.systemDefault())
+                        .atZone(istZone)
                         .toLocalDate()
                     localDate.toString()
                 }.distinct().sorted()
 
-                // Filter by date if provided
+                // Filter by date if provided (using IST timezone)
                 val filteredEvents = if (date != null) {
                     val trimmedDate = date.trim()
                     allEvents.filter { event ->
                         val timestamp = event[AppUsageEvents.eventTimestamp]
                         val localDate = java.time.Instant.ofEpochMilli(timestamp.toEpochMilliseconds())
-                            .atZone(java.time.ZoneId.systemDefault())
+                            .atZone(istZone)
                             .toLocalDate()
                         localDate.toString() == trimmedDate
                     }
@@ -114,11 +115,11 @@ class UsageStatsRepository {
                     )
                 }
 
-                // Get date counts
+                // Get date counts (using IST timezone)
                 val dateCounts = allEvents.map { event ->
                     val timestamp = event[AppUsageEvents.eventTimestamp]
                     val localDate = java.time.Instant.ofEpochMilli(timestamp.toEpochMilliseconds())
-                        .atZone(java.time.ZoneId.systemDefault())
+                        .atZone(istZone)
                         .toLocalDate()
                     localDate.toString()
                 }.groupBy { it }.mapValues { it.value.size }
@@ -189,11 +190,12 @@ class UsageStatsRepository {
                     val userEvents = allEvents.filter { it[AppUsageEvents.userId] == uid }
                     val sampleEvent = userEvents.firstOrNull()
 
-                    // Extract unique dates from event timestamps
+                    // Extract unique dates from event timestamps (using IST timezone)
+                    val istZone = java.time.ZoneId.of("Asia/Kolkata")
                     val uniqueDates = userEvents.map { event ->
                         val timestamp = event[AppUsageEvents.eventTimestamp]
                         val localDate = java.time.Instant.ofEpochMilli(timestamp.toEpochMilliseconds())
-                            .atZone(java.time.ZoneId.systemDefault())
+                            .atZone(istZone)
                             .toLocalDate()
                         localDate.toString()
                     }.distinct().sorted()

@@ -129,31 +129,36 @@ class FocusRepository {
                 0L
             }
             
-            // Calculate today's focus time
+            // Calculate today's focus time (using IST timezone)
+            val istZone = java.time.ZoneId.of("Asia/Kolkata")
             val today = kotlinx.datetime.Clock.System.now()
-            val todayStart = kotlinx.datetime.Instant.fromEpochMilliseconds(
-                today.toEpochMilliseconds() - (today.toEpochMilliseconds() % (24 * 60 * 60 * 1000))
-            )
+            val todayIST = java.time.Instant.ofEpochMilli(today.toEpochMilliseconds())
+                .atZone(istZone)
+                .toLocalDate()
+            val todayStart = java.time.LocalDate.of(todayIST.year, todayIST.monthValue, todayIST.dayOfMonth)
+                .atStartOfDay(istZone)
+                .toInstant()
+            val todayStartInstant = kotlinx.datetime.Instant.fromEpochMilliseconds(todayStart.toEpochMilli())
             val todaySessions = allSessions.filter {
-                kotlinx.datetime.Instant.parse(it.startTime) >= todayStart
+                kotlinx.datetime.Instant.parse(it.startTime) >= todayStartInstant
             }
             val todayFocusTime = todaySessions.sumOf { it.focusDuration }
             
-            // Calculate weekly focus time (last 7 days)
-            val weekAgo = kotlinx.datetime.Instant.fromEpochMilliseconds(
-                today.toEpochMilliseconds() - (7 * 24 * 60 * 60 * 1000)
-            )
+            // Calculate weekly focus time (last 7 days in IST)
+            val weekAgoIST = todayIST.minusDays(7)
+            val weekAgoStart = weekAgoIST.atStartOfDay(istZone).toInstant()
+            val weekAgoStartInstant = kotlinx.datetime.Instant.fromEpochMilliseconds(weekAgoStart.toEpochMilli())
             val weeklySessions = allSessions.filter {
-                kotlinx.datetime.Instant.parse(it.startTime) >= weekAgo
+                kotlinx.datetime.Instant.parse(it.startTime) >= weekAgoStartInstant
             }
             val weeklyFocusTime = weeklySessions.sumOf { it.focusDuration }
             
-            // Calculate monthly focus time (last 30 days)
-            val monthAgo = kotlinx.datetime.Instant.fromEpochMilliseconds(
-                today.toEpochMilliseconds() - (30 * 24 * 60 * 60 * 1000)
-            )
+            // Calculate monthly focus time (last 30 days in IST)
+            val monthAgoIST = todayIST.minusDays(30)
+            val monthAgoStart = monthAgoIST.atStartOfDay(istZone).toInstant()
+            val monthAgoStartInstant = kotlinx.datetime.Instant.fromEpochMilliseconds(monthAgoStart.toEpochMilli())
             val monthlySessions = allSessions.filter {
-                kotlinx.datetime.Instant.parse(it.startTime) >= monthAgo
+                kotlinx.datetime.Instant.parse(it.startTime) >= monthAgoStartInstant
             }
             val monthlyFocusTime = monthlySessions.sumOf { it.focusDuration }
             

@@ -89,10 +89,11 @@ class FocusService(
             sessionType = request.sessionType
         )
         
-        // Update leaderboard with focus time
+        // Update leaderboard with focus time (using IST timezone)
         if (endTime != null) {
+            val istZone = java.time.ZoneId.of("Asia/Kolkata")
             val date = java.time.Instant.ofEpochMilli(startTime.toEpochMilliseconds())
-                .atZone(java.time.ZoneId.systemDefault())
+                .atZone(istZone)
                 .toLocalDate()
             
             leaderboardRepository.updateLeaderboardWithFocusTime(

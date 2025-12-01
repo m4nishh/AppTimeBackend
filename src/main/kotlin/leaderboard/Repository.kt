@@ -153,8 +153,14 @@ class LeaderboardRepository {
             // Get all events with duration (these represent actual screen time)
             val eventsQuery = if (date != null) {
                 // Sync for specific date
+                // Adjust UTC boundaries to match IST day boundaries (IST is UTC+5:30)
+                val istOffsetHours = 5
+                val istOffsetMinutes = 30
+                val istOffsetSeconds = istOffsetHours * 3600 + istOffsetMinutes * 60
+                
                 val startOfDay = date.atStartOfDay(ZoneId.of("UTC")).toInstant()
-                val endOfDay = date.plusDays(1).atStartOfDay(ZoneId.of("UTC")).toInstant()
+                    .minusSeconds(istOffsetSeconds.toLong()) // Subtract IST offset to get IST midnight in UTC
+                val endOfDay = startOfDay.plusSeconds(86400) // Add 24 hours (start of next day)
                 val startInstant = kotlinx.datetime.Instant.fromEpochMilliseconds(startOfDay.toEpochMilli())
                 val endInstant = kotlinx.datetime.Instant.fromEpochMilliseconds(endOfDay.toEpochMilli())
                 
@@ -184,10 +190,17 @@ class LeaderboardRepository {
             }
             
             // Group events by userId and date
+            // Use IST timezone to get the correct date for grouping
+            val istOffsetHours = 5
+            val istOffsetMinutes = 30
+            val istOffsetSeconds = istOffsetHours * 3600 + istOffsetMinutes * 60
+            val istZone = ZoneId.of("Asia/Kolkata")
+            
             val userDateStats = events.groupBy { event ->
                 val eventTimestamp = event[AppUsageEvents.eventTimestamp]
+                // Convert to IST to get the correct local date
                 val localDate = java.time.Instant.ofEpochMilli(eventTimestamp.toEpochMilliseconds())
-                    .atZone(ZoneId.of("UTC"))
+                    .atZone(istZone)
                     .toLocalDate()
                 Pair(event[AppUsageEvents.userId], localDate)
             }.mapValues { (_, eventList) ->
