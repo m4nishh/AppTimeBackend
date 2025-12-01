@@ -215,3 +215,13 @@ data class AppUsageLastSyncResponse(
     val hasEvents: Boolean // true if user has submitted any app usage events
 )
 
+/**
+ * Response for deleting user events
+ */
+@Serializable
+data class DeleteUserEventsResponse(
+    val userId: String,
+    val deletedCount: Int,
+    val message: String
+)
+

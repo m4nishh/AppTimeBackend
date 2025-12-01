@@ -112,5 +112,18 @@ class AppUsageEventRepository {
             ?.get(AppUsageEvents.eventTimestamp)
         }
     }
+    
+    /**
+     * Delete all app usage events for a user
+     * @param userId The user ID whose events should be deleted
+     * @return Number of deleted events
+     */
+    fun deleteUserEvents(userId: String): Int {
+        return dbTransaction {
+            AppUsageEvents.deleteWhere {
+                AppUsageEvents.userId eq userId
+            }
+        }
+    }
 }
 

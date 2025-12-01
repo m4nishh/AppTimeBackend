@@ -37,6 +37,9 @@ fun Application.module() {
     configureLeaderboardRoutes()
     configureChallengeRoutes()
     configureAdminRoutes()
+    
+    // Configure scheduled jobs (cronjobs)
+    configureScheduledJobs()
 
     routing {
         // Serve admin dashboard

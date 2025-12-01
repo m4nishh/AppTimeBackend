@@ -219,6 +219,21 @@ fun Application.configureAppUsageEventRoutes() {
                         call.respondError(HttpStatusCode.InternalServerError, "Failed to retrieve last sync time: ${e.message}")
                     }
                 }
+                
+                /**
+                 * DELETE /api/usage/stats/delete
+                 * Delete all app usage events for the authenticated user (requires authentication)
+                 * This will permanently delete all events from app_usage_events table for the user
+                 */
+                delete("/delete") {
+                    try {
+                        val userId = call.requireUserId()
+                        val response = eventStatsService.deleteUserEvents(userId)
+                        call.respondApi(response, "User events deleted successfully")
+                    } catch (e: Exception) {
+                        call.respondError(HttpStatusCode.InternalServerError, "Failed to delete user events: ${e.message}")
+                    }
+                }
             }
         }
     }

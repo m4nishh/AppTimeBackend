@@ -169,5 +169,17 @@ class AppUsageEventStatsService(
             hasEvents = lastSyncTime != null
         )
     }
+    
+    /**
+     * Delete all app usage events for a user
+     */
+    suspend fun deleteUserEvents(userId: String): DeleteUserEventsResponse {
+        val deletedCount = repository.deleteUserEvents(userId)
+        return DeleteUserEventsResponse(
+            userId = userId,
+            deletedCount = deletedCount,
+            message = "Successfully deleted $deletedCount event(s) for user"
+        )
+    }
 }
 
