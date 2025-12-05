@@ -267,6 +267,91 @@ fun Application.configureAdminRoutes() {
                 }
             }
             
+            // Reward Management
+            route("/rewards") {
+                // Get all rewards
+                get {
+                    try {
+                        val limit = call.request.queryParameters["limit"]?.toIntOrNull() ?: 100
+                        val offset = call.request.queryParameters["offset"]?.toIntOrNull() ?: 0
+                        val rewards = adminRepository.getAllRewards(limit, offset)
+                        call.respondApi(rewards, "Rewards retrieved successfully")
+                    } catch (e: Exception) {
+                        call.respondError(HttpStatusCode.InternalServerError, "Failed to retrieve rewards: ${e.message}")
+                    }
+                }
+                
+                // Get reward by ID
+                get("/{id}") {
+                    try {
+                        val id = call.parameters["id"]?.toLongOrNull()
+                            ?: throw IllegalArgumentException("Invalid reward ID")
+                        val reward = adminRepository.getRewardById(id)
+                        if (reward != null) {
+                            call.respondApi(reward, "Reward retrieved successfully")
+                        } else {
+                            call.respondError(HttpStatusCode.NotFound, "Reward not found")
+                        }
+                    } catch (e: IllegalArgumentException) {
+                        call.respondError(HttpStatusCode.BadRequest, e.message ?: "Invalid request")
+                    } catch (e: Exception) {
+                        call.respondError(HttpStatusCode.InternalServerError, "Failed to retrieve reward: ${e.message}")
+                    }
+                }
+                
+                // Create reward
+                post {
+                    try {
+                        val request = call.receive<CreateRewardRequest>()
+                        val id = adminRepository.createReward(request)
+                        val reward = adminRepository.getRewardById(id)
+                        call.respondApi(reward, "Reward created successfully", HttpStatusCode.Created)
+                    } catch (e: IllegalArgumentException) {
+                        call.respondError(HttpStatusCode.BadRequest, e.message ?: "Invalid request")
+                    } catch (e: Exception) {
+                        call.respondError(HttpStatusCode.InternalServerError, "Failed to create reward: ${e.message}")
+                    }
+                }
+                
+                // Update reward
+                put("/{id}") {
+                    try {
+                        val id = call.parameters["id"]?.toLongOrNull()
+                            ?: throw IllegalArgumentException("Invalid reward ID")
+                        val request = call.receive<UpdateRewardRequest>()
+                        val updated = adminRepository.updateReward(id, request)
+                        if (updated) {
+                            val reward = adminRepository.getRewardById(id)
+                            call.respondApi(reward, "Reward updated successfully")
+                        } else {
+                            call.respondError(HttpStatusCode.NotFound, "Reward not found")
+                        }
+                    } catch (e: IllegalArgumentException) {
+                        call.respondError(HttpStatusCode.BadRequest, e.message ?: "Invalid request")
+                    } catch (e: Exception) {
+                        call.respondError(HttpStatusCode.InternalServerError, "Failed to update reward: ${e.message}")
+                    }
+                }
+                
+                // Delete reward
+                delete("/{id}") {
+                    try {
+                        val id = call.parameters["id"]?.toLongOrNull()
+                            ?: throw IllegalArgumentException("Invalid reward ID")
+                        val deleted = adminRepository.deleteReward(id)
+                        if (deleted) {
+                            call.respondApi("", "Reward deleted successfully")
+                        } else {
+                            call.respondError(HttpStatusCode.NotFound, "Reward not found")
+                        }
+                    } catch (e: IllegalArgumentException) {
+                        call.respondError(HttpStatusCode.BadRequest, e.message ?: "Invalid request")
+                    } catch (e: Exception) {
+                        call.respondError(HttpStatusCode.InternalServerError, "Failed to delete reward: ${e.message}")
+                    }
+                }
+            }
+            
             // Consent Template Management
             route("/consents") {
                 // Get all consent templates

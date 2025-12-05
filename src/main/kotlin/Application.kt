@@ -7,6 +7,7 @@ import com.apptime.code.common.configureAuthentication
 import com.apptime.code.consents.configureConsentRoutes
 import com.apptime.code.focus.configureFocusRoutes
 import com.apptime.code.leaderboard.configureLeaderboardRoutes
+import com.apptime.code.rewards.configureRewardRoutes
 import users.configureUserRoutes
 import usage.configureAppUsageEventRoutes
 import io.ktor.serialization.kotlinx.json.*
@@ -36,6 +37,7 @@ fun Application.module() {
     configureAppUsageEventRoutes()
     configureLeaderboardRoutes()
     configureChallengeRoutes()
+    configureRewardRoutes()
     configureAdminRoutes()
     
     // Configure scheduled jobs (cronjobs)

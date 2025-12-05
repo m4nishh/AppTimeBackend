@@ -12,6 +12,7 @@ import com.apptime.code.focus.FocusSessions
 import com.apptime.code.focus.FocusModeStats
 import com.apptime.code.leaderboard.LeaderboardStats
 import com.apptime.code.notifications.Notifications
+import com.apptime.code.rewards.Rewards
 import com.apptime.code.users.Users
 import users.TOTPVerificationSessions
 import com.zaxxer.hikari.HikariConfig
@@ -34,6 +35,12 @@ object DatabaseFactory {
         val dbUser = EnvLoader.getEnv("DB_USER") ?: "postgres"
         val dbPassword = EnvLoader.getEnv("DB_PASSWORD") ?: "Sharma@11"
 
+        // Print connection details for debugging (mask password)
+        println("🔌 Attempting to connect to database...")
+        println("   URL: $jdbcUrl")
+        println("   User: $dbUser")
+        println("   Password: ${if (dbPassword.isNotEmpty()) "***" else "(empty)"}")
+
         val config = HikariConfig().apply {
             this.jdbcUrl = jdbcUrl
             username = dbUser
@@ -41,27 +48,73 @@ object DatabaseFactory {
             driverClassName = "org.postgresql.Driver"
             maximumPoolSize = 10
             minimumIdle = 2
-            isAutoCommit = false
+            isAutoCommit = true  // Exposed manages transactions, so connections should be in auto-commit mode
             transactionIsolation = "TRANSACTION_REPEATABLE_READ"
+            
+            // Connection timeout settings
+            connectionTimeout = 10000 // 10 seconds
+            validationTimeout = 5000 // 5 seconds
+            idleTimeout = 600000 // 10 minutes
+            maxLifetime = 1800000 // 30 minutes
+            
+            // Connection test query
+            connectionTestQuery = "SELECT 1"
+            
+            // Leak detection
+            leakDetectionThreshold = 60000 // 1 minute
+            
             validate()
         }
 
-        val dataSource = HikariDataSource(config)
-
-        Database.connect(
-            dataSource,
-            databaseConfig = DatabaseConfig {
-                defaultRepetitionAttempts = 3
+        try {
+            val dataSource = HikariDataSource(config)
+            
+            // Test the connection immediately
+            dataSource.connection.use { conn ->
+                if (conn.isValid(5)) {
+                    println("✅ Database connection test successful!")
+                } else {
+                    throw Exception("Connection validation failed")
+                }
             }
-        )
 
-        // Create all tables
-        createTables()
-        
-        // Seed initial data
-        seedInitialData()
+            Database.connect(
+                dataSource,
+                databaseConfig = DatabaseConfig {
+                    defaultRepetitionAttempts = 3
+                }
+            )
 
-        println("✅ Database connected successfully!")
+            // Create all tables
+            createTables()
+            
+            // Seed initial data
+            seedInitialData()
+
+            println("✅ Database connected successfully!")
+        } catch (e: Exception) {
+            println("❌ Database connection failed!")
+            println("   Error: ${e.message}")
+            println("   Cause: ${e.cause?.message ?: "Unknown"}")
+            
+            // Provide helpful troubleshooting information
+            println("\n🔍 Troubleshooting steps:")
+            println("   1. Check if PostgreSQL is running:")
+            println("      - macOS: brew services list | grep postgresql")
+            println("      - Linux: sudo systemctl status postgresql")
+            println("      - Docker: docker ps | grep postgres")
+            println("   2. Verify database exists:")
+            println("      psql -U $dbUser -l | grep screentime_db")
+            println("   3. Test connection manually:")
+            println("      psql -U $dbUser -d screentime_db -h localhost")
+            println("   4. Check connection details:")
+            println("      URL: $jdbcUrl")
+            println("      User: $dbUser")
+            println("   5. Create .env file with correct credentials if needed")
+            
+            // Re-throw to prevent application from starting with broken database
+            throw RuntimeException("Failed to connect to database. See error details above.", e)
+        }
     }
 
     private fun createTables() {
@@ -98,7 +151,10 @@ object DatabaseFactory {
                 // Challenges module
                 Challenges,
                 ChallengeParticipants,
-                ChallengeParticipantStats
+                ChallengeParticipantStats,
+                
+                // Rewards module
+                Rewards
             )
         }
         println("✅ Database tables created/verified!")

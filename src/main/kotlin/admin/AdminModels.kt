@@ -132,3 +132,51 @@ data class AdminVerifyResponse(
     val valid: Boolean
 )
 
+// Reward Management Models
+@Serializable
+data class CreateRewardRequest(
+    val userId: String,
+    val type: String, // POINTS, BADGE, COUPON, TROPHY, CUSTOM
+    val source: String, // CHALLENGE_WIN, CHALLENGE_PARTICIPATION, DAILY_LOGIN, etc.
+    val title: String,
+    val description: String? = null,
+    val amount: Long = 0,
+    val metadata: String? = null,
+    val challengeId: Long? = null,
+    val challengeTitle: String? = null,
+    val rank: Int? = null
+)
+
+@Serializable
+data class UpdateRewardRequest(
+    val userId: String? = null,
+    val type: String? = null,
+    val source: String? = null,
+    val title: String? = null,
+    val description: String? = null,
+    val amount: Long? = null,
+    val metadata: String? = null,
+    val challengeId: Long? = null,
+    val challengeTitle: String? = null,
+    val rank: Int? = null,
+    val isClaimed: Boolean? = null
+)
+
+@Serializable
+data class AdminRewardResponse(
+    val id: Long,
+    val userId: String,
+    val type: String,
+    val source: String,
+    val title: String,
+    val description: String? = null,
+    val amount: Long = 0,
+    val metadata: String? = null,
+    val challengeId: Long? = null,
+    val challengeTitle: String? = null,
+    val rank: Int? = null,
+    val earnedAt: String,
+    val isClaimed: Boolean = false,
+    val claimedAt: String? = null
+)
+

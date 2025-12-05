@@ -5,6 +5,7 @@ import com.apptime.code.challenges.Challenges
 import com.apptime.code.common.dbTransaction
 import com.apptime.code.consents.ConsentTemplates
 import com.apptime.code.consents.UserConsents
+import com.apptime.code.rewards.Rewards
 import com.apptime.code.users.Users
 import kotlinx.datetime.Instant
 import org.jetbrains.exposed.sql.*
@@ -280,6 +281,111 @@ class AdminRepository {
     fun deleteConsentTemplate(id: Int): Boolean {
         return dbTransaction {
             val deleteCount = ConsentTemplates.deleteWhere { ConsentTemplates.id eq id }
+            deleteCount > 0
+        }
+    }
+    
+    // Reward Management
+    fun getAllRewards(limit: Int = 100, offset: Int = 0): List<AdminRewardResponse> {
+        return dbTransaction {
+            Rewards.selectAll()
+                .orderBy(Rewards.earnedAt to SortOrder.DESC)
+                .limit(limit, offset.toLong())
+                .map { row ->
+                    AdminRewardResponse(
+                        id = row[Rewards.id],
+                        userId = row[Rewards.userId],
+                        type = row[Rewards.type],
+                        source = row[Rewards.rewardSource],
+                        title = row[Rewards.title],
+                        description = row[Rewards.description],
+                        amount = row[Rewards.amount],
+                        metadata = row[Rewards.metadata],
+                        challengeId = row[Rewards.challengeId],
+                        challengeTitle = row[Rewards.challengeTitle],
+                        rank = row[Rewards.rank],
+                        earnedAt = row[Rewards.earnedAt].toString(),
+                        isClaimed = row[Rewards.isClaimed],
+                        claimedAt = row[Rewards.claimedAt]?.toString()
+                    )
+                }
+        }
+    }
+    
+    fun getRewardById(id: Long): AdminRewardResponse? {
+        return dbTransaction {
+            Rewards.select { Rewards.id eq id }
+                .firstOrNull()
+                ?.let { row ->
+                    AdminRewardResponse(
+                        id = row[Rewards.id],
+                        userId = row[Rewards.userId],
+                        type = row[Rewards.type],
+                        source = row[Rewards.rewardSource],
+                        title = row[Rewards.title],
+                        description = row[Rewards.description],
+                        amount = row[Rewards.amount],
+                        metadata = row[Rewards.metadata],
+                        challengeId = row[Rewards.challengeId],
+                        challengeTitle = row[Rewards.challengeTitle],
+                        rank = row[Rewards.rank],
+                        earnedAt = row[Rewards.earnedAt].toString(),
+                        isClaimed = row[Rewards.isClaimed],
+                        claimedAt = row[Rewards.claimedAt]?.toString()
+                    )
+                }
+        }
+    }
+    
+    fun createReward(request: CreateRewardRequest): Long {
+        return dbTransaction {
+            Rewards.insert {
+                it[Rewards.userId] = request.userId
+                it[Rewards.type] = request.type
+                it[Rewards.rewardSource] = request.source
+                it[Rewards.title] = request.title
+                it[Rewards.description] = request.description
+                it[Rewards.amount] = request.amount
+                it[Rewards.metadata] = request.metadata
+                it[Rewards.challengeId] = request.challengeId
+                it[Rewards.challengeTitle] = request.challengeTitle
+                it[Rewards.rank] = request.rank
+            } get Rewards.id
+        }
+    }
+    
+    fun updateReward(id: Long, request: UpdateRewardRequest): Boolean {
+        return dbTransaction {
+            // First, get the current reward to check its claimed status
+            val currentReward = Rewards.select { Rewards.id eq id }.firstOrNull()
+            
+            val updateCount = Rewards.update({ Rewards.id eq id }) {
+                request.userId?.let { value -> it[Rewards.userId] = value }
+                request.type?.let { value -> it[Rewards.type] = value }
+                request.source?.let { value -> it[Rewards.rewardSource] = value }
+                request.title?.let { value -> it[Rewards.title] = value }
+                request.description?.let { value -> it[Rewards.description] = value }
+                request.amount?.let { value -> it[Rewards.amount] = value }
+                request.metadata?.let { value -> it[Rewards.metadata] = value }
+                request.challengeId?.let { value -> it[Rewards.challengeId] = value }
+                request.challengeTitle?.let { value -> it[Rewards.challengeTitle] = value }
+                request.rank?.let { value -> it[Rewards.rank] = value }
+                request.isClaimed?.let { value -> 
+                    it[Rewards.isClaimed] = value
+                    if (value && currentReward?.get(Rewards.claimedAt) == null) {
+                        it[Rewards.claimedAt] = kotlinx.datetime.Clock.System.now()
+                    } else if (!value) {
+                        it[Rewards.claimedAt] = null
+                    }
+                }
+            }
+            updateCount > 0
+        }
+    }
+    
+    fun deleteReward(id: Long): Boolean {
+        return dbTransaction {
+            val deleteCount = Rewards.deleteWhere { Rewards.id eq id }
             deleteCount > 0
         }
     }

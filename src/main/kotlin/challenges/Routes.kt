@@ -4,6 +4,8 @@ import com.apptime.code.common.respondApi
 import com.apptime.code.common.respondError
 import com.apptime.code.common.requireUserId
 import com.apptime.code.common.userId
+import com.apptime.code.rewards.RewardRepository
+import com.apptime.code.rewards.RewardService
 import io.ktor.http.*
 import io.ktor.server.application.*
 import io.ktor.server.auth.*
@@ -16,6 +18,8 @@ import io.ktor.server.routing.*
 fun Application.configureChallengeRoutes() {
     val repository = ChallengeRepository()
     val service = ChallengeService(repository)
+    val rewardRepository = RewardRepository()
+    val rewardService = RewardService(rewardRepository, repository)
     
     routing {
         route("/api/challenges") {
@@ -48,6 +52,22 @@ fun Application.configureChallengeRoutes() {
                         val request = call.receive<JoinChallengeRequest>()
                         
                         val response = service.joinChallenge(userId, request.challengeId)
+                        
+                        // Award participation reward
+                        try {
+                            val challenge = repository.getChallengeById(request.challengeId)
+                            if (challenge != null) {
+                                rewardService.awardChallengeParticipationReward(
+                                    userId = userId,
+                                    challengeId = request.challengeId,
+                                    challengeTitle = challenge.title
+                                )
+                            }
+                        } catch (e: Exception) {
+                            // Log error but don't fail the join request if reward fails
+                            println("Failed to award participation reward: ${e.message}")
+                        }
+                        
                         call.respondApi(response, response.message, HttpStatusCode.Created)
                     } catch (e: IllegalArgumentException) {
                         call.respondError(HttpStatusCode.BadRequest, e.message ?: "Invalid request")
