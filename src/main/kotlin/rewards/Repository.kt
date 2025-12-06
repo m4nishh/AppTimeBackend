@@ -375,6 +375,7 @@ class RewardRepository {
                         title = row[RewardCatalog.title],
                         description = row[RewardCatalog.description],
                         category = row[RewardCatalog.category],
+                        rewardType = row[RewardCatalog.rewardType],
                         coinPrice = row[RewardCatalog.coinPrice],
                         imageUrl = row[RewardCatalog.imageUrl],
                         stockQuantity = row[RewardCatalog.stockQuantity],
@@ -400,6 +401,7 @@ class RewardRepository {
                         title = row[RewardCatalog.title],
                         description = row[RewardCatalog.description],
                         category = row[RewardCatalog.category],
+                        rewardType = row[RewardCatalog.rewardType],
                         coinPrice = row[RewardCatalog.coinPrice],
                         imageUrl = row[RewardCatalog.imageUrl],
                         stockQuantity = row[RewardCatalog.stockQuantity],
@@ -419,6 +421,7 @@ class RewardRepository {
         title: String,
         description: String? = null,
         category: String? = null,
+        rewardType: String = "PHYSICAL",
         coinPrice: Long,
         imageUrl: String? = null,
         stockQuantity: Int = -1,
@@ -430,6 +433,7 @@ class RewardRepository {
                 it[RewardCatalog.title] = title
                 it[RewardCatalog.description] = description
                 it[RewardCatalog.category] = category
+                it[RewardCatalog.rewardType] = rewardType
                 it[RewardCatalog.coinPrice] = coinPrice
                 it[RewardCatalog.imageUrl] = imageUrl
                 it[RewardCatalog.stockQuantity] = stockQuantity
@@ -478,7 +482,7 @@ class RewardRepository {
         recipientName: String,
         recipientPhone: String? = null,
         recipientEmail: String? = null,
-        shippingAddress: String,
+        shippingAddress: String? = null,
         city: String? = null,
         state: String? = null,
         postalCode: String? = null,

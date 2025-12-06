@@ -65,6 +65,7 @@ object RewardCatalog : Table("reward_catalog") {
     val title = varchar("title", 255)
     val description = text("description").nullable()
     val category = varchar("category", 100).nullable() // e.g., "Electronics", "Vouchers", "Merchandise"
+    val rewardType = varchar("reward_type", 20).default("PHYSICAL") // PHYSICAL or DIGITAL
     val coinPrice = long("coin_price") // Price in coins
     val imageUrl = varchar("image_url", 500).nullable()
     val stockQuantity = integer("stock_quantity").default(0) // Available quantity (-1 for unlimited)
@@ -78,6 +79,7 @@ object RewardCatalog : Table("reward_catalog") {
     init {
         index(isUnique = false, category)
         index(isUnique = false, isActive)
+        index(isUnique = false, rewardType)
     }
 }
 
@@ -97,7 +99,7 @@ object Transactions : Table("transactions") {
     val recipientName = varchar("recipient_name", 255)
     val recipientPhone = varchar("recipient_phone", 50).nullable()
     val recipientEmail = varchar("recipient_email", 255).nullable()
-    val shippingAddress = text("shipping_address") // Full address
+    val shippingAddress = text("shipping_address").nullable() // Full address (required for PHYSICAL, optional for DIGITAL)
     val city = varchar("city", 100).nullable()
     val state = varchar("state", 100).nullable()
     val postalCode = varchar("postal_code", 20).nullable()

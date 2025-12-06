@@ -15,6 +15,15 @@ enum class RewardType {
 }
 
 /**
+ * Reward catalog type enum - determines what information is needed when claiming
+ */
+@Serializable
+enum class RewardCatalogType {
+    PHYSICAL,        // Physical reward - requires full shipping address
+    DIGITAL          // Digital reward - only requires email and phone
+}
+
+/**
  * Reward source enum - where the reward came from
  */
 @Serializable
@@ -215,6 +224,7 @@ data class RewardCatalogItem(
     val title: String,
     val description: String? = null,
     val category: String? = null,
+    val rewardType: String, // PHYSICAL or DIGITAL
     val coinPrice: Long,
     val imageUrl: String? = null,
     val stockQuantity: Int, // -1 for unlimited
@@ -232,6 +242,7 @@ data class CreateRewardCatalogRequest(
     val title: String,
     val description: String? = null,
     val category: String? = null,
+    val rewardType: String = "PHYSICAL", // PHYSICAL or DIGITAL (default: PHYSICAL)
     val coinPrice: Long,
     val imageUrl: String? = null,
     val stockQuantity: Int = -1, // -1 for unlimited
@@ -256,7 +267,7 @@ data class Transaction(
     val recipientName: String,
     val recipientPhone: String? = null,
     val recipientEmail: String? = null,
-    val shippingAddress: String,
+    val shippingAddress: String? = null, // Required for PHYSICAL rewards, null for DIGITAL
     val city: String? = null,
     val state: String? = null,
     val postalCode: String? = null,
@@ -274,6 +285,8 @@ data class Transaction(
 
 /**
  * Request to claim a reward (create a transaction)
+ * For PHYSICAL rewards: recipientName, shippingAddress are required
+ * For DIGITAL rewards: recipientName, recipientEmail (or recipientPhone) are required
  */
 @Serializable
 data class ClaimRewardCatalogRequest(
@@ -281,7 +294,8 @@ data class ClaimRewardCatalogRequest(
     val recipientName: String,
     val recipientPhone: String? = null,
     val recipientEmail: String? = null,
-    val shippingAddress: String,
+    // Shipping fields - required for PHYSICAL rewards, optional for DIGITAL
+    val shippingAddress: String? = null,
     val city: String? = null,
     val state: String? = null,
     val postalCode: String? = null,

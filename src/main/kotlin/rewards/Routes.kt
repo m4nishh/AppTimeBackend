@@ -275,6 +275,9 @@ fun Application.configureRewardRoutes() {
                  * POST /api/rewards/catalog/claim
                  * Claim a reward (create a transaction)
                  * Request body: ClaimRewardCatalogRequest
+                 * 
+                 * For PHYSICAL rewards: recipientName and shippingAddress are required
+                 * For DIGITAL rewards: recipientName and (recipientEmail OR recipientPhone) are required
                  */
                 post("/catalog/claim") {
                     try {

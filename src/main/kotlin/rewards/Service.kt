@@ -360,10 +360,18 @@ class RewardService(
      * Create a reward catalog item (admin)
      */
     suspend fun createRewardCatalogItem(request: CreateRewardCatalogRequest): RewardCatalogItem {
+        // Validate reward type
+        val rewardType = try {
+            RewardCatalogType.valueOf(request.rewardType.uppercase())
+        } catch (e: IllegalArgumentException) {
+            throw IllegalArgumentException("Invalid reward type. Must be PHYSICAL or DIGITAL")
+        }
+        
         val catalogId = repository.createRewardCatalogItem(
             title = request.title,
             description = request.description,
             category = request.category,
+            rewardType = rewardType.name,
             coinPrice = request.coinPrice,
             imageUrl = request.imageUrl,
             stockQuantity = request.stockQuantity,
@@ -395,6 +403,29 @@ class RewardService(
         
         if (!catalogItem.isActive) {
             throw IllegalStateException("This reward is not currently available")
+        }
+        
+        // Validate reward type and required fields
+        val rewardType = try {
+            RewardCatalogType.valueOf(catalogItem.rewardType.uppercase())
+        } catch (e: IllegalArgumentException) {
+            throw IllegalArgumentException("Invalid reward type in catalog item")
+        }
+        
+        // Validate required fields based on reward type
+        when (rewardType) {
+            RewardCatalogType.PHYSICAL -> {
+                // Physical rewards require shipping address
+                if (request.shippingAddress.isNullOrBlank()) {
+                    throw IllegalArgumentException("Shipping address is required for physical rewards")
+                }
+            }
+            RewardCatalogType.DIGITAL -> {
+                // Digital rewards require email or phone
+                if (request.recipientEmail.isNullOrBlank() && request.recipientPhone.isNullOrBlank()) {
+                    throw IllegalArgumentException("Email or phone number is required for digital rewards")
+                }
+            }
         }
         
         // Check stock availability
