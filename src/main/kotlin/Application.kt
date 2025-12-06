@@ -68,5 +68,33 @@ fun Application.module() {
                 )
             )
         }
+        
+        // Android App Links verification
+        route(".well-known") {
+            get("/assetlinks.json") {
+                // Set content type to application/json
+                call.response.headers.append("Content-Type", "application/json")
+                
+                // Android App Links assetlinks.json
+                val assetLinks = listOf(
+                    mapOf(
+                        "relation" to listOf(
+                            "delegate_permission/common.handle_all_urls",
+                            "delegate_permission/common.get_login_creds"
+                        ),
+                        "target" to mapOf(
+                            "namespace" to "android_app",
+                            "package_name" to "com.app.screentime",
+                            "sha256_cert_fingerprints" to listOf(
+                                "61:B2:93:19:28:69:7D:4B:51:24:AB:D0:83:A9:2C:3A:2E:BA:D6:0E:C7:30:95:70:E1:F9:0C:1C:2E:44:E6:E0"
+                                // Add additional fingerprints here if needed (e.g., for debug/release variants)
+                            )
+                        )
+                    )
+                )
+                
+                call.respond(assetLinks)
+            }
+        }
     }
 }
