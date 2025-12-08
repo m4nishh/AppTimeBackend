@@ -1,6 +1,7 @@
 package com.apptime.code.challenges
 
 import kotlinx.datetime.Instant
+import java.time.LocalDate
 
 /**
  * Challenge service layer - handles business logic
@@ -194,15 +195,32 @@ class ChallengeService(
         // Get top 10 rankings
         val rankings = repository.getChallengeRankings(challengeId, challenge.challengeType, limit = 10)
         
-        // Build rank entries
-        val rankEntries = rankings.mapIndexed { index, (userId, totalDuration) ->
-            val appCount = repository.getUserAppCount(userId, challengeId)
-            ChallengeRankEntry(
-                rank = index + 1,
-                userId = userId,
-                totalDuration = totalDuration,
-                appCount = appCount
+        // Build rank entries with proper tie handling
+        // Users with the same duration share the same rank
+        val rankEntries = mutableListOf<ChallengeRankEntry>()
+        var currentRank = 1
+        var previousDuration: Long? = null
+        
+        for (index in rankings.indices) {
+            val (uid, totalDuration) = rankings[index]
+            
+            // Update rank when duration changes (ties share the same rank)
+            if (previousDuration != null && totalDuration != previousDuration) {
+                currentRank = index + 1
+            }
+            // Note: currentRank is already initialized to 1 for the first entry
+            
+            val appCount = repository.getUserAppCount(uid, challengeId)
+            rankEntries.add(
+                ChallengeRankEntry(
+                    rank = currentRank,
+                    userId = uid,
+                    totalDuration = totalDuration,
+                    appCount = appCount
+                )
             )
+            
+            previousDuration = totalDuration
         }
         
         // Get user's rank if provided
@@ -236,6 +254,21 @@ class ChallengeService(
             userRank = userRank,
             totalParticipants = totalParticipants
         )
+    }
+    
+    /**
+     * Sync challenge stats from app_usage_events to challenge_participant_stats
+     * @param date Optional date in YYYY-MM-DD format. If not provided, syncs all events from active challenges
+     */
+    suspend fun syncChallengeStatsFromAppUsageEvents(date: String? = null): ChallengeStatsSyncResponse {
+        val localDate = date?.let {
+            try {
+                LocalDate.parse(it, java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd"))
+            } catch (e: Exception) {
+                throw IllegalArgumentException("Invalid date format. Expected YYYY-MM-DD")
+            }
+        }
+        return repository.syncChallengeStatsFromAppUsageEvents(localDate)
     }
 }
 

@@ -157,11 +157,23 @@ class RewardService(
             )
         }
         
-        // Award points based on rank
+        // Award points based on rank with proper tie handling
+        // Users with the same duration share the same rank
         // Rank 1: 1000 points, Rank 2: 500 points, Rank 3: 250 points, etc.
-        val rewardsToCreate = rankings.mapIndexed { index, (userId, _) ->
-            val rank = index + 1
-            val points = when (rank) {
+        val rewardsToCreate = mutableListOf<CreateRewardRequest>()
+        var currentRank = 1
+        var previousDuration: Long? = null
+        
+        for (index in rankings.indices) {
+            val (userId, totalDuration) = rankings[index]
+            
+            // Update rank when duration changes (ties share the same rank)
+            if (previousDuration != null && totalDuration != previousDuration) {
+                currentRank = index + 1
+            }
+            // Note: currentRank is already initialized to 1 for the first entry
+            
+            val points = when (currentRank) {
                 1 -> 1000L
                 2 -> 500L
                 3 -> 250L
@@ -169,22 +181,24 @@ class RewardService(
             }
             
             // Check if user already has a reward for this challenge and rank
-            if (repository.hasChallengeReward(userId, challengeId, rank)) {
-                null // Skip if already rewarded
-            } else {
-                CreateRewardRequest(
-                    userId = userId,
-                    type = RewardType.POINTS.name,
-                    source = RewardSource.CHALLENGE_WIN.name,
-                    title = "Challenge Winner - Rank $rank",
-                    description = "Won rank $rank in challenge: ${challenge.title}",
-                    amount = points,
-                    challengeId = challengeId,
-                    challengeTitle = challenge.title,
-                    rank = rank
+            if (!repository.hasChallengeReward(userId, challengeId, currentRank)) {
+                rewardsToCreate.add(
+                    CreateRewardRequest(
+                        userId = userId,
+                        type = RewardType.POINTS.name,
+                        source = RewardSource.CHALLENGE_WIN.name,
+                        title = "Challenge Winner - Rank $currentRank",
+                        description = "Won rank $currentRank in challenge: ${challenge.title}",
+                        amount = points,
+                        challengeId = challengeId,
+                        challengeTitle = challenge.title,
+                        rank = currentRank
+                    )
                 )
             }
-        }.filterNotNull()
+            
+            previousDuration = totalDuration
+        }
         
         if (rewardsToCreate.isEmpty()) {
             return AwardChallengeRewardsResponse(

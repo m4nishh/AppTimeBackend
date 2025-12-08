@@ -206,3 +206,15 @@ data class ChallengeLastSyncResponse(
     val hasStats: Boolean // true if user has submitted any stats for this challenge
 )
 
+/**
+ * Response for challenge stats sync operation
+ */
+@Serializable
+data class ChallengeStatsSyncResponse(
+    val message: String,
+    val eventsProcessed: Int,
+    val challengesProcessed: Int,
+    val statsCreated: Int,
+    val usersUpdated: Int
+)
+
