@@ -1,6 +1,7 @@
 package com.apptime.code.challenges
 
 import com.apptime.code.common.dbTransaction
+import com.apptime.code.users.Users
 import org.jetbrains.exposed.sql.*
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
 import kotlinx.datetime.Clock
@@ -229,16 +230,26 @@ class ChallengeRepository {
     }
     
     /**
+     * Data class for ranking entry with userId, username, and duration
+     */
+    data class RankingEntry(
+        val userId: String,
+        val username: String, // username or userId if username is null
+        val duration: Long
+    )
+    
+    /**
      * Get challenge rankings
      * For LESS_SCREENTIME: rank by total duration ascending (lower is better)
      * For MORE_SCREENTIME: rank by total duration descending (higher is better)
      * Handles ties: users with same duration share the same rank
+     * Returns usernames instead of userIds (falls back to userId if username is null)
      */
     fun getChallengeRankings(
         challengeId: Long,
         challengeType: String,
         limit: Int = 10
-    ): List<Pair<String, Long>> {
+    ): List<RankingEntry> {
         return dbTransaction {
             val stats = ChallengeParticipantStats.select {
                 ChallengeParticipantStats.challengeId eq challengeId
@@ -257,7 +268,23 @@ class ChallengeRepository {
                 userTotals.toList().sortedByDescending { it.second } // Descending (higher is better)
             }
             
-            sorted.take(limit)
+            // Get top users
+            val topUsers = sorted.take(limit)
+            
+            // Fetch usernames for all userIds at once
+            val userIds = topUsers.map { it.first }
+            val usernameMap = if (userIds.isNotEmpty()) {
+                Users.select { Users.userId inList userIds }
+                    .associate { it[Users.userId] to it[Users.username] }
+            } else {
+                emptyMap()
+            }
+            
+            // Return ranking entries with userId, username (or userId fallback), and duration
+            topUsers.map { (userId, duration) ->
+                val username = usernameMap[userId] ?: userId
+                RankingEntry(userId = userId, username = username, duration = duration)
+            }
         }
     }
     
@@ -319,6 +346,18 @@ class ChallengeRepository {
             }
             
             null // User not found in sorted list
+        }
+    }
+    
+    /**
+     * Get username for a userId (falls back to userId if username is null)
+     */
+    fun getUsername(userId: String): String {
+        return dbTransaction {
+            Users.select { Users.userId eq userId }
+                .firstOrNull()
+                ?.get(Users.username)
+                ?: userId
         }
     }
     

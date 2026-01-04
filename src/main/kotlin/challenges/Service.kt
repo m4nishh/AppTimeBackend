@@ -202,7 +202,9 @@ class ChallengeService(
         var previousDuration: Long? = null
         
         for (index in rankings.indices) {
-            val (uid, totalDuration) = rankings[index]
+            val rankingEntry = rankings[index]
+            val username = rankingEntry.username
+            val totalDuration = rankingEntry.duration
             
             // Update rank when duration changes (ties share the same rank)
             if (previousDuration != null && totalDuration != previousDuration) {
@@ -210,11 +212,12 @@ class ChallengeService(
             }
             // Note: currentRank is already initialized to 1 for the first entry
             
-            val appCount = repository.getUserAppCount(uid, challengeId)
+            // Use userId from ranking entry to get appCount
+            val appCount = repository.getUserAppCount(rankingEntry.userId, challengeId)
             rankEntries.add(
                 ChallengeRankEntry(
                     rank = currentRank,
-                    userId = uid,
+                    userId = username, // Use username (or userId fallback) for display
                     totalDuration = totalDuration,
                     appCount = appCount
                 )
@@ -230,9 +233,10 @@ class ChallengeService(
                 val userRankPosition = repository.getUserRank(uid, challengeId, challenge.challengeType)
                 if (userRankPosition != null) {
                     val appCount = repository.getUserAppCount(uid, challengeId)
+                    val username = repository.getUsername(uid)
                     ChallengeRankEntry(
                         rank = userRankPosition,
-                        userId = uid,
+                        userId = username,
                         totalDuration = userDuration,
                         appCount = appCount
                     )

@@ -165,7 +165,9 @@ class RewardService(
         var previousDuration: Long? = null
         
         for (index in rankings.indices) {
-            val (userId, totalDuration) = rankings[index]
+            val rankingEntry = rankings[index]
+            val userId = rankingEntry.userId
+            val totalDuration = rankingEntry.duration
             
             // Update rank when duration changes (ties share the same rank)
             if (previousDuration != null && totalDuration != previousDuration) {
