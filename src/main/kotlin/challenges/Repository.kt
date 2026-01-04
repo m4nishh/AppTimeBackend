@@ -3,7 +3,6 @@ package com.apptime.code.challenges
 import com.apptime.code.common.dbTransaction
 import com.apptime.code.users.Users
 import org.jetbrains.exposed.sql.*
-import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
 import kotlinx.datetime.Clock
 import kotlinx.datetime.Instant
 import usage.AppUsageEvents
@@ -67,6 +66,7 @@ class ChallengeRepository {
                     thumbnail = row[Challenges.thumbnail],
                     packageNames = row[Challenges.packageNames],
                     scheme = row[Challenges.colorScheme],
+                    variant = row[Challenges.variant],
                     participantCount = participantCounts[challengeId] ?: 0,
                     hasJoined = joinedChallengeIds.contains(challengeId)
                 )
@@ -91,6 +91,7 @@ class ChallengeRepository {
                         endTime = row[Challenges.endTime].toString(),
                         thumbnail = row[Challenges.thumbnail],
                         challengeType = row[Challenges.challengeType],
+                        variant = row[Challenges.variant],
                         isActive = row[Challenges.isActive],
                         createdAt = row[Challenges.createdAt].toString()
                     )
@@ -196,6 +197,7 @@ class ChallengeRepository {
                 challengeType = challenge[Challenges.challengeType],
                 packageNames = challenge[Challenges.packageNames],
                 scheme = challenge[Challenges.colorScheme],
+                variant = challenge[Challenges.variant],
                 isActive = challenge[Challenges.isActive],
                 participantCount = participantCount,
                 hasJoined = hasJoined,

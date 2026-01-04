@@ -18,6 +18,8 @@ data class CreateChallengeRequest(
     val displayType: String? = null,
     val tags: String? = null, // Comma-separated
     val sponsor: String? = null,
+    val colorScheme: String? = null, // Color scheme for the challenge (e.g., "blue", "purple", "green")
+    val variant: String? = null, // Challenge varient (e.g., "varient1", "varient2", "varient3")
     val isActive: Boolean = true
 )
 
@@ -36,6 +38,8 @@ data class UpdateChallengeRequest(
     val displayType: String? = null,
     val tags: String? = null,
     val sponsor: String? = null,
+    val colorScheme: String? = null, // Color scheme for the challenge (e.g., "blue", "purple", "green")
+    val variant: String? = null, // Challenge varient (e.g., "varient1", "varient2", "varient3")
     val isActive: Boolean? = null
 )
 
@@ -55,6 +59,8 @@ data class AdminChallengeResponse(
     val displayType: String? = null,
     val tags: String? = null,
     val sponsor: String? = null,
+    val colorScheme: String? = null, // Color scheme for the challenge (e.g., "blue", "purple", "green")
+    val variant: String? = null, // Challenge varient (e.g., "varient1", "varient2", "varient3")
     val isActive: Boolean,
     val participantCount: Long,
     val createdAt: String

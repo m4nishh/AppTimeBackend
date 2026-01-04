@@ -34,6 +34,7 @@ data class Challenge(
     val endTime: String,   // ISO 8601 format
     val thumbnail: String? = null,
     val challengeType: String, // "LESS_SCREENTIME" or "MORE_SCREENTIME"
+    val variant: String? = null, // Challenge varient (e.g., "varient1", "varient2", "varient3")
     val isActive: Boolean = true,
     val createdAt: String? = null
 )
@@ -57,6 +58,7 @@ data class ActiveChallenge(
     val thumbnail: String? = null,
     val packageNames: String? = null, // Comma-separated package names
     val scheme: String? = null, // Color scheme for the challenge (e.g., "blue", "purple", "green")
+    val variant: String? = null, // Challenge varient (e.g., "varient1", "varient2", "varient3")
     val participantCount: Int = 0, // Number of participants who joined this challenge
     val hasJoined: Boolean = false
 )
@@ -134,6 +136,7 @@ data class ChallengeDetail(
     val challengeType: String,
     val packageNames: String? = null, // Comma-separated package names
     val scheme: String? = null, // Color scheme for the challenge (e.g., "blue", "purple", "green")
+    val variant: String? = null, // Challenge varient (e.g., "varient1", "varient2", "varient3")
     val isActive: Boolean,
     val participantCount: Int,
     val hasJoined: Boolean = false, // Whether the current user has joined this challenge

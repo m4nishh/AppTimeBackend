@@ -39,6 +39,8 @@ class AdminRepository {
                         displayType = row[Challenges.displayType],
                         tags = row[Challenges.tags],
                         sponsor = row[Challenges.sponsor],
+                        colorScheme = row[Challenges.colorScheme],
+                        variant = row[Challenges.variant],
                         isActive = row[Challenges.isActive],
                         participantCount = participantCount,
                         createdAt = row[Challenges.createdAt].toString()
@@ -71,6 +73,8 @@ class AdminRepository {
                         displayType = row[Challenges.displayType],
                         tags = row[Challenges.tags],
                         sponsor = row[Challenges.sponsor],
+                        colorScheme = row[Challenges.colorScheme],
+                        variant = row[Challenges.variant],
                         isActive = row[Challenges.isActive],
                         participantCount = participantCount,
                         createdAt = row[Challenges.createdAt].toString()
@@ -95,6 +99,8 @@ class AdminRepository {
                 it[displayType] = request.displayType
                 it[tags] = request.tags
                 it[sponsor] = request.sponsor
+                it[colorScheme] = request.colorScheme
+                it[variant] = request.variant
                 it[isActive] = request.isActive
             } get Challenges.id
         }
@@ -116,6 +122,8 @@ class AdminRepository {
                 request.displayType?.let { value -> it[Challenges.displayType] = value }
                 request.tags?.let { value -> it[Challenges.tags] = value }
                 request.sponsor?.let { value -> it[Challenges.sponsor] = value }
+                request.colorScheme?.let { value -> it[Challenges.colorScheme] = value }
+                request.variant?.let { value -> it[Challenges.variant] = value }
                 request.isActive?.let { value -> it[Challenges.isActive] = value }
             }
             updateCount > 0

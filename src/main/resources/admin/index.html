@@ -659,6 +659,66 @@
                     <input type="text" id="challengeSponsor">
                 </div>
                 <div class="form-group">
+                    <label>Color Scheme</label>
+                    <select id="challengeColorScheme">
+                        <option value="">None</option>
+                        <option value="magentaScheme">Magenta Scheme</option>
+                        <option value="cheddarSecondaryScheme">Cheddar Secondary Scheme</option>
+                        <option value="neutralScheme">Neutral Scheme</option>
+                        <option value="iguanaSecondaryScheme">Iguana Secondary Scheme</option>
+                        <option value="blueScheme">Blue Scheme</option>
+                        <option value="blueSecondaryScheme">Blue Secondary Scheme</option>
+                        <option value="purpleScheme">Purple Scheme</option>
+                        <option value="purpleSecondaryScheme">Purple Secondary Scheme</option>
+                        <option value="greenScheme">Green Scheme</option>
+                        <option value="greenSecondaryScheme">Green Secondary Scheme</option>
+                        <option value="redScheme">Red Scheme</option>
+                        <option value="redSecondaryScheme">Red Secondary Scheme</option>
+                        <option value="orangeScheme">Orange Scheme</option>
+                        <option value="orangeSecondaryScheme">Orange Secondary Scheme</option>
+                        <option value="yellowScheme">Yellow Scheme</option>
+                        <option value="yellowSecondaryScheme">Yellow Secondary Scheme</option>
+                        <option value="pinkScheme">Pink Scheme</option>
+                        <option value="pinkSecondaryScheme">Pink Secondary Scheme</option>
+                        <option value="tealScheme">Teal Scheme</option>
+                        <option value="tealSecondaryScheme">Teal Secondary Scheme</option>
+                        <option value="cyanScheme">Cyan Scheme</option>
+                        <option value="cyanSecondaryScheme">Cyan Secondary Scheme</option>
+                        <option value="indigoScheme">Indigo Scheme</option>
+                        <option value="indigoSecondaryScheme">Indigo Secondary Scheme</option>
+                        <option value="amberScheme">Amber Scheme</option>
+                        <option value="amberSecondaryScheme">Amber Secondary Scheme</option>
+                        <option value="limeScheme">Lime Scheme</option>
+                        <option value="limeSecondaryScheme">Lime Secondary Scheme</option>
+                        <option value="emeraldScheme">Emerald Scheme</option>
+                        <option value="emeraldSecondaryScheme">Emerald Secondary Scheme</option>
+                        <option value="violetScheme">Violet Scheme</option>
+                        <option value="violetSecondaryScheme">Violet Secondary Scheme</option>
+                        <option value="roseScheme">Rose Scheme</option>
+                        <option value="roseSecondaryScheme">Rose Secondary Scheme</option>
+                        <option value="slateScheme">Slate Scheme</option>
+                        <option value="slateSecondaryScheme">Slate Secondary Scheme</option>
+                        <option value="grayScheme">Gray Scheme</option>
+                        <option value="graySecondaryScheme">Gray Secondary Scheme</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Variant</label>
+                    <select id="challengeVariant">
+                        <option value="">None</option>
+                        <option value="variant1">Variant 1</option>
+                        <option value="variant2">Variant 2</option>
+                        <option value="variant3">Variant 3</option>
+                        <option value="variant4">Variant 4</option>
+                        <option value="variant5">Variant 5</option>
+                        <option value="variant6">Variant 6</option>
+                        <option value="variant7">Variant 7</option>
+                        <option value="variant8">Variant 8</option>
+                        <option value="variant9">Variant 9</option>
+                        <option value="variant10">Variant 10</option>
+                    </select>
+                </div>
+                <div class="form-group">
                     <label>
                         <input type="checkbox" id="challengeIsActive" checked> Active
                     </label>
@@ -1099,6 +1159,8 @@
                 document.getElementById('challengeDisplayType').value = challenge.displayType || '';
                 document.getElementById('challengeTags').value = challenge.tags || '';
                 document.getElementById('challengeSponsor').value = challenge.sponsor || '';
+                document.getElementById('challengeColorScheme').value = challenge.colorScheme || '';
+                document.getElementById('challengeVariant').value = challenge.variant || '';
                 document.getElementById('challengeIsActive').checked = challenge.isActive;
             } else {
                 title.textContent = 'Create Challenge';
@@ -1133,6 +1195,8 @@
                 displayType: document.getElementById('challengeDisplayType').value || null,
                 tags: document.getElementById('challengeTags').value || null,
                 sponsor: document.getElementById('challengeSponsor').value || null,
+                colorScheme: document.getElementById('challengeColorScheme').value || null,
+                variant: document.getElementById('challengeVariant').value || null,
                 isActive: document.getElementById('challengeIsActive').checked
             };
 

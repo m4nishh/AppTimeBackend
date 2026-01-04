@@ -22,6 +22,7 @@ object Challenges : Table("challenges") {
     val tags = text("tags").nullable() // Comma-separated challenge tags (e.g., "browser,study,gaming,social media")
     val sponsor = varchar("sponsor", 255).nullable() // Challenge sponsor name
     val colorScheme = varchar("color_scheme", 100).nullable() // Color scheme for the challenge (e.g., "blue", "purple", "green")
+    val variant = varchar("variant", 50).nullable() // Challenge varient (e.g., "varient1", "varient2", "varient3")
     val isActive = bool("is_active").default(true)
     val createdAt = timestamp("created_at").clientDefault { kotlinx.datetime.Clock.System.now() }
     
