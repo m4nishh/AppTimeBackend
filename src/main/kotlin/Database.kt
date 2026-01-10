@@ -12,6 +12,7 @@ import com.apptime.code.features.FeatureFlags
 import com.apptime.code.focus.FocusSessions
 import com.apptime.code.focus.FocusModeStats
 import com.apptime.code.leaderboard.LeaderboardStats
+import com.apptime.code.location.UserLocations
 import com.apptime.code.notifications.Notifications
 import com.apptime.code.rewards.Coins
 import com.apptime.code.rewards.Rewards
@@ -125,6 +126,9 @@ object DatabaseFactory {
                 // Users module
                 Users,
                 TOTPVerificationSessions,
+
+                // Location module
+                UserLocations,
 
                 // Usage module
                 AppUsageEvents,
