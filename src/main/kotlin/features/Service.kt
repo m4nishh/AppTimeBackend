@@ -6,21 +6,26 @@ package com.apptime.code.features
 class FeatureFlagsService(private val repository: FeatureFlagsRepository) {
     
     /**
-     * Get all feature flags as a map (for frontend)
+     * Get all feature flags (for frontend)
      * Evaluates conditions based on provided parameters
-     * Returns a simple map of featureName -> isEnabled
+     * Returns only enabled features as a list
      */
     fun getFeatureFlagsMap(params: FeatureEvaluationParams = FeatureEvaluationParams()): FeatureFlagsResponse {
         val flags = repository.getAllFeatureFlags()
-        val featuresMap = flags.associate { flag ->
-            val isEnabled = ConditionEvaluator.evaluateFeature(
-                flag.isEnabled,
-                flag.conditions,
-                params
-            )
-            flag.featureName to isEnabled
-        }
-        return FeatureFlagsResponse(features = featuresMap)
+        val enabledFeatures = flags
+            .filter { flag ->
+                ConditionEvaluator.evaluateFeature(
+                    flag.isEnabled,
+                    flag.conditions,
+                    params
+                )
+            }
+            .map { it.featureName }
+            .sorted() // Sort alphabetically for consistent ordering
+        
+        return FeatureFlagsResponse(
+            features = FeatureFlagsInner(enabled = enabledFeatures)
+        )
     }
     
     /**

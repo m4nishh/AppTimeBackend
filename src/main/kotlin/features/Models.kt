@@ -30,11 +30,19 @@ data class FeatureFlag(
 )
 
 /**
+ * Feature flags inner data structure
+ */
+@Serializable
+data class FeatureFlagsInner(
+    val enabled: List<String> // List of enabled feature names
+)
+
+/**
  * Feature flags response (for frontend)
  */
 @Serializable
 data class FeatureFlagsResponse(
-    val features: Map<String, Boolean> // featureName -> isEnabled
+    val features: FeatureFlagsInner
 )
 
 /**
