@@ -472,5 +472,96 @@ class UserRepository {
                 }
         }
     }
+    
+    /**
+     * Get all active sessions where current user is the target (who is viewing my profile)
+     */
+    fun getActiveSessionsForTargetUser(targetUserId: String): List<Map<String, Any>> {
+        return dbTransaction {
+            val now = kotlinx.datetime.Clock.System.now()
+            TOTPVerificationSessions.select {
+                (TOTPVerificationSessions.targetUserId eq targetUserId) and
+                (TOTPVerificationSessions.expiresAt greaterEq now)
+            }.orderBy(TOTPVerificationSessions.verifiedAt to SortOrder.DESC)
+                .map { session ->
+                    val expiresAt = session[TOTPVerificationSessions.expiresAt]
+                    val remainingSeconds = (expiresAt.toEpochMilliseconds() - now.toEpochMilliseconds()) / 1000
+                    
+                    // Get requesting user's username
+                    val requestingUserId = session[TOTPVerificationSessions.requestingUserId]
+                    val requestingUser = Users.select { Users.userId eq requestingUserId }.firstOrNull()
+                    val requestingUsername = requestingUser?.get(Users.username)
+                    
+                    mapOf<String, Any>(
+                        "requestingUserId" to requestingUserId,
+                        "requestingUsername" to (requestingUsername ?: ""),
+                        "verifiedAt" to session[TOTPVerificationSessions.verifiedAt].toString(),
+                        "expiresAt" to expiresAt.toString(),
+                        "remainingSeconds" to remainingSeconds.toInt(),
+                        "accessType" to "TOTP"
+                    )
+                }
+        }
+    }
+    
+    /**
+     * Revoke access by invalidating a session
+     */
+    fun revokeAccess( requestingUserId: String, targetUserId: String): Boolean {
+        return dbTransaction {
+            val now = kotlinx.datetime.Clock.System.now()
+            val updated = TOTPVerificationSessions.update(
+                where = {
+                    (TOTPVerificationSessions.targetUserId eq targetUserId) and
+                    (TOTPVerificationSessions.requestingUserId eq requestingUserId) and
+                    (TOTPVerificationSessions.expiresAt greaterEq now)
+                }
+            ) {
+                it[TOTPVerificationSessions.expiresAt] = now
+            }
+            updated > 0
+        }
+    }
+    
+    /**
+     * Extend access time for a session
+     */
+    fun extendAccessTime(targetUserId: String, requestingUserId: String, additionalSeconds: Int): Map<String, Any>? {
+        return dbTransaction {
+            val now = kotlinx.datetime.Clock.System.now()
+            val session = TOTPVerificationSessions.select {
+                (TOTPVerificationSessions.targetUserId eq targetUserId) and
+                (TOTPVerificationSessions.requestingUserId eq requestingUserId) and
+                (TOTPVerificationSessions.expiresAt greaterEq now)
+            }.orderBy(TOTPVerificationSessions.verifiedAt to SortOrder.DESC)
+                .firstOrNull()
+            
+            if (session != null) {
+                val currentExpiresAt = session[TOTPVerificationSessions.expiresAt]
+                val newExpiresAt = Instant.fromEpochMilliseconds(
+                    currentExpiresAt.toEpochMilliseconds() + (additionalSeconds * 1000L)
+                )
+                
+                TOTPVerificationSessions.update(
+                    where = {
+                        (TOTPVerificationSessions.id eq session[TOTPVerificationSessions.id])
+                    }
+                ) {
+                    it[TOTPVerificationSessions.expiresAt] = newExpiresAt
+                }
+                
+                val remainingSeconds = (newExpiresAt.toEpochMilliseconds() - now.toEpochMilliseconds()) / 1000
+                
+                mapOf<String, Any>(
+                    "success" to true,
+                    "newExpiresAt" to newExpiresAt.toString(),
+                    "remainingSeconds" to remainingSeconds.toInt()
+                )
+            } else {
+                null
+            }
+        }
+    }
+    
 }
 

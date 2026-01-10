@@ -351,6 +351,127 @@ fun Application.configureUserRoutes() {
                         call.respondError(HttpStatusCode.InternalServerError, "Failed to get sync status: ${e.message}")
                     }
                 }
+                
+                /**
+                 * GET /api/v1/user/totp/control-panel
+                 * Get TOTP control panel overview
+                 * Shows all users who have access to authenticated user's data via TOTP sessions
+                 */
+                get("/totp/control-panel") {
+                    try {
+                        val userId = call.requireUserId()
+                        val response = service.getControlPanelOverview(userId)
+                        call.respondApi(response, "Control panel data retrieved successfully")
+                    } catch (e: IllegalArgumentException) {
+                        call.respondError(HttpStatusCode.BadRequest, e.message ?: "Invalid request")
+                    } catch (e: Exception) {
+                        call.respondError(HttpStatusCode.InternalServerError, "Failed to get control panel data: ${e.message}")
+                    }
+                }
+                
+                /**
+                 * POST /api/v1/user/totp/grant-access
+                 * Grant access to a user without requiring TOTP verification
+                 */
+                post("/totp/grant-access") {
+                    try {
+                        val userId = call.requireUserId()
+                        val request = call.receive<GrantAccessRequest>()
+                        
+                        if (request.username.isBlank()) {
+                            call.respondError(HttpStatusCode.BadRequest, "Username is required")
+                            return@post
+                        }
+                        
+                        val response = service.grantAccessWithoutTOTP(
+                            userId,
+                            request.username,
+                            request.durationSeconds
+                        )
+                        
+                        if (response.success) {
+                            call.respondApi(response, "Access granted successfully")
+                        } else {
+                            call.respondError(HttpStatusCode.BadRequest, response.message)
+                        }
+                    } catch (e: IllegalArgumentException) {
+                        call.respondError(HttpStatusCode.BadRequest, e.message ?: "Invalid request")
+                    } catch (e: Exception) {
+                        call.respondError(HttpStatusCode.InternalServerError, "Failed to grant access: ${e.message}")
+                    }
+                }
+                
+                /**
+                 * POST /api/v1/user/totp/revoke-access
+                 * Revoke access for a user (invalidate their TOTP session)
+                 */
+                post("/totp/revoke-access") {
+                    try {
+                        val userId = call.requireUserId()
+                        val request = call.receive<RevokeAccessRequest>()
+                        
+                        if (request.username.isBlank()) {
+                            call.respondError(HttpStatusCode.BadRequest, "Username is required")
+                            return@post
+                        }
+
+                        // Get user ID by username
+                        val requestingUserId = repository.getUserIdByUsername(request.username)
+                            ?: throw IllegalArgumentException("User not found")
+
+                        println("requestingUserId : "+ requestingUserId)
+                        println("userId : "+ userId)
+
+                        val success = service.revokeAccess(requestingUserId, userId )
+                        
+                        if (success) {
+                            call.respondApi(
+                                SimpleResponse(success = true, message = "Access revoked successfully"),
+                                "Access revoked successfully"
+                            )
+                        } else {
+                            call.respondError(HttpStatusCode.NotFound, "No active session found to revoke")
+                        }
+                    } catch (e: IllegalArgumentException) {
+                        call.respondError(HttpStatusCode.BadRequest, e.message ?: "Invalid request")
+                    } catch (e: Exception) {
+                        call.respondError(HttpStatusCode.InternalServerError, "Failed to revoke access: ${e.message}")
+                    }
+                }
+                
+                /**
+                 * POST /api/v1/user/totp/extend-access
+                 * Extend access time for a user's session
+                 */
+                post("/totp/extend-access") {
+                    try {
+                        val userId = call.requireUserId()
+                        val request = call.receive<ExtendAccessRequest>()
+                        
+                        if (request.username.isBlank()) {
+                            call.respondError(HttpStatusCode.BadRequest, "Requesting user ID is required")
+                            return@post
+                        }
+                        
+                        if (request.additionalSeconds <= 0) {
+                            call.respondError(HttpStatusCode.BadRequest, "Additional seconds must be greater than 0")
+                            return@post
+                        }
+                        val requestingUserId = repository.getUserIdByUsername(request.username);
+                        
+                        val response = service.extendAccessTime(userId, requestingUserId.toString(), request.additionalSeconds)
+                        
+                        if (response.success) {
+                            call.respondApi(response, "Access time extended successfully")
+                        } else {
+                            call.respondError(HttpStatusCode.NotFound, response.message)
+                        }
+                    } catch (e: IllegalArgumentException) {
+                        call.respondError(HttpStatusCode.BadRequest, e.message ?: "Invalid request")
+                    } catch (e: Exception) {
+                        call.respondError(HttpStatusCode.InternalServerError, "Failed to extend access time: ${e.message}")
+                    }
+                }
             }
         }
     }

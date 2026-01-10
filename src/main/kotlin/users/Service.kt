@@ -382,5 +382,159 @@ class UserService(private val repository: UserRepository) {
             )
         }
     }
+    
+    /**
+     * Get control panel overview - all users who have access to current user's data
+     */
+    suspend fun getControlPanelOverview(targetUserId: String): TOTPControlPanelResponse {
+        if (targetUserId.isBlank()) {
+            throw IllegalArgumentException("User ID is required")
+        }
+        
+        // Get active TOTP sessions
+        val activeSessions = repository.getActiveSessionsForTargetUser(targetUserId)
+        val totpAccessors = activeSessions.map { session ->
+            TOTPAccessorInfo(
+                requestingUsername = session["requestingUsername"] as? String,
+                verifiedAt = session["verifiedAt"] as String,
+                expiresAt = session["expiresAt"] as? String,
+                remainingSeconds = session["remainingSeconds"] as? Int,
+                accessType = session["accessType"] as String
+            )
+        }
+        
+        return TOTPControlPanelResponse(
+            activeSessions = totpAccessors
+        )
+    }
+    
+    /**
+     * Revoke access for a user
+     */
+    suspend fun revokeAccess(requestingUserId: String,targetUserId: String): Boolean {
+        if (targetUserId.isBlank()) {
+            throw IllegalArgumentException("Target user ID is required")
+        }
+        if (requestingUserId.isBlank()) {
+            throw IllegalArgumentException("Requesting user ID is required")
+        }
+        
+        return repository.revokeAccess(requestingUserId,targetUserId)
+    }
+    
+    /**
+     * Grant access to a user without requiring TOTP verification
+     */
+    suspend fun grantAccessWithoutTOTP(
+        targetUserId: String,
+        username: String,
+        durationSeconds: Int? = null
+    ): ExtendAccessResponse {
+        if (targetUserId.isBlank()) {
+            throw IllegalArgumentException("Target user ID is required")
+        }
+        if (username.isBlank()) {
+            throw IllegalArgumentException("Username is required")
+        }
+        
+        // Get user ID by username
+        val requestingUserId = repository.getUserIdByUsername(username)
+            ?: throw IllegalArgumentException("User not found")
+        
+        // Prevent self-granting
+        if (targetUserId == requestingUserId) {
+            throw IllegalArgumentException("Cannot grant access to yourself")
+        }
+
+        val targetUserName = repository.getUserById(targetUserId)?.username;
+
+
+        // Validate and set duration (default: 1 day, max: 1 year)
+        val defaultDuration = 86400 // 1 day
+        val maxDuration = 31536000 // 1 year
+        
+        val sessionDuration = when {
+            durationSeconds == null -> defaultDuration
+            durationSeconds > maxDuration -> maxDuration
+            durationSeconds <= 0 -> throw IllegalArgumentException("Duration must be greater than 0")
+            else -> durationSeconds
+        }
+        
+        // Create session without TOTP verification
+        repository.createTOTPVerificationSession(
+            requestingUserId = requestingUserId,
+            targetUserId = targetUserId,
+            targetUsername = targetUserName,
+            durationSeconds = sessionDuration
+        )
+        
+        // Calculate session expiration
+        val now = kotlinx.datetime.Clock.System.now()
+        val sessionExpiresAt = kotlinx.datetime.Instant.fromEpochMilliseconds(
+            now.toEpochMilliseconds() + (sessionDuration * 1000)
+        )
+        
+        val remainingSeconds = sessionDuration
+        
+        // Format duration message
+        val durationMessage = when {
+            sessionDuration < 3600 -> "${sessionDuration / 60} minute(s)"
+            sessionDuration < 86400 -> "${sessionDuration / 3600} hour(s)"
+            sessionDuration < 31536000 -> "${sessionDuration / 86400} day(s)"
+            else -> "${sessionDuration / 31536000} year(s)"
+        }
+        
+        return ExtendAccessResponse(
+            success = true,
+            message = "Access granted without TOTP verification for $durationMessage.",
+            expiresAt = sessionExpiresAt.toString(),
+            remainingSeconds = remainingSeconds
+        )
+    }
+    
+    /**
+     * Extend access time for a session
+     */
+    suspend fun extendAccessTime(
+        targetUserId: String,
+        requestingUserId: String,
+        additionalSeconds: Int
+    ): ExtendAccessResponse {
+        if (targetUserId.isBlank()) {
+            throw IllegalArgumentException("Target user ID is required")
+        }
+        if (requestingUserId.isBlank()) {
+            throw IllegalArgumentException("Requesting user ID is required")
+        }
+        if (additionalSeconds <= 0) {
+            throw IllegalArgumentException("Additional seconds must be greater than 0")
+        }
+        
+        // Maximum extension: 7 days (604800 seconds)
+        val maxAdditionalSeconds = 604800
+        val actualAdditionalSeconds = if (additionalSeconds > maxAdditionalSeconds) {
+            maxAdditionalSeconds
+        } else {
+            additionalSeconds
+        }
+        
+        val result = repository.extendAccessTime(targetUserId, requestingUserId, actualAdditionalSeconds)
+        
+        return if (result != null) {
+            ExtendAccessResponse(
+                success = true,
+                message = "Access time extended successfully",
+                expiresAt = result["newExpiresAt"] as? String,
+                remainingSeconds = result["remainingSeconds"] as? Int
+            )
+        } else {
+            ExtendAccessResponse(
+                success = false,
+                message = "No active session found to extend",
+                expiresAt = null,
+                remainingSeconds = null
+            )
+        }
+    }
 }
 
