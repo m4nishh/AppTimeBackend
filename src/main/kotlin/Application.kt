@@ -9,6 +9,7 @@ import com.apptime.code.consents.configureConsentRoutes
 import com.apptime.code.features.configureFeatureFlagsRoutes
 import com.apptime.code.focus.configureFocusRoutes
 import com.apptime.code.leaderboard.configureLeaderboardRoutes
+import com.apptime.code.location.configureLocationRoutes
 import com.apptime.code.rewards.configureRewardRoutes
 import users.configureUserRoutes
 import usage.configureAppUsageEventRoutes
@@ -37,6 +38,7 @@ fun Application.module() {
 
     configureAuthentication()
     configureUserRoutes()
+    configureLocationRoutes()
     configureConsentRoutes()
     configureFocusRoutes()
     configureAppUsageEventRoutes()
