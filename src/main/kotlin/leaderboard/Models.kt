@@ -31,3 +31,21 @@ data class LeaderboardSyncResponse(
     val dateSynced: String? = null
 )
 
+@Serializable
+data class UpdateLeaderboardStatsRequest(
+    val period: String, // "daily" only - weekly and monthly are automatically updated from daily stats
+    val periodDate: String, // YYYY-MM-DD format for daily
+    val totalScreenTime: Long, // milliseconds
+    val replace: Boolean = false // If true, replaces existing value. If false, adds to existing value.
+)
+
+@Serializable
+data class UpdateLeaderboardStatsResponse(
+    val success: Boolean,
+    val message: String,
+    val period: String,
+    val periodDate: String,
+    val totalScreenTime: Long,
+    val action: String // "created" or "updated"
+)
+

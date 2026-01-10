@@ -79,5 +79,73 @@ class LeaderboardService(
         }
         return repository.syncFromAppUsageEvents(localDate)
     }
+    
+    /**
+     * Get monthly leaderboard
+     * @param monthDate Optional month date in YYYY-MM format. If not provided, uses current month
+     * @param currentUserId Optional current user ID to determine userRank
+     */
+    suspend fun getMonthlyLeaderboard(monthDate: String? = null, currentUserId: String? = null): LeaderboardResponse {
+        // Parse and validate month date
+        val periodDate = if (monthDate != null) {
+            // Validate month date format (YYYY-MM)
+            try {
+                LocalDate.parse("${monthDate}-01", DateTimeFormatter.ofPattern("yyyy-MM-dd"))
+                monthDate
+            } catch (e: Exception) {
+                throw IllegalArgumentException("Invalid month date format. Expected YYYY-MM (e.g., 2024-01)")
+            }
+        } else {
+            LocalDate.now().format(DateTimeFormatter.ofPattern("yyyy-MM"))
+        }
+        
+        return repository.getMonthlyLeaderboard(periodDate, currentUserId)
+    }
+    
+    /**
+     * Directly update leaderboard stats for a user
+     * Only daily period is supported - weekly and monthly are automatically updated from daily stats
+     * @param userId User ID
+     * @param period Period type: "daily" only (weekly/monthly are automatically updated)
+     * @param periodDate Period date: YYYY-MM-DD for daily
+     * @param totalScreenTime Screen time in milliseconds
+     * @param replace If true, replaces existing total. If false, adds to existing total.
+     * @return UpdateLeaderboardStatsResponse with result
+     */
+    suspend fun updateLeaderboardStats(
+        userId: String,
+        period: String,
+        periodDate: String,
+        totalScreenTime: Long,
+        replace: Boolean = false
+    ): UpdateLeaderboardStatsResponse {
+        // Only daily period is supported - weekly and monthly are automatically updated
+        if (period != "daily") {
+            throw IllegalArgumentException("Only 'daily' period is supported. Weekly and monthly stats are automatically updated from daily stats.")
+        }
+        
+        // Validate periodDate format for daily
+        val date = try {
+            LocalDate.parse(periodDate, DateTimeFormatter.ofPattern("yyyy-MM-dd"))
+        } catch (e: Exception) {
+            throw IllegalArgumentException("Invalid periodDate format. Expected YYYY-MM-DD (e.g., 2024-01-15)")
+        }
+        
+        // Validate totalScreenTime
+        if (totalScreenTime < 0) {
+            throw IllegalArgumentException("totalScreenTime must be non-negative")
+        }
+        
+        val (action, finalTotalScreenTime) = repository.updateLeaderboardStats(userId, period, periodDate, totalScreenTime, replace)
+        
+        return UpdateLeaderboardStatsResponse(
+            success = true,
+            message = "Leaderboard stats ${action} successfully. Weekly and monthly stats updated automatically.",
+            period = period,
+            periodDate = periodDate,
+            totalScreenTime = finalTotalScreenTime,
+            action = action
+        )
+    }
 }
 

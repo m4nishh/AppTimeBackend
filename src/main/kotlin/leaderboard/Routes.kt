@@ -2,10 +2,12 @@ package com.apptime.code.leaderboard
 
 import com.apptime.code.common.respondApi
 import com.apptime.code.common.respondError
+import com.apptime.code.common.requireUserId
 import com.apptime.code.common.userId
 import io.ktor.http.*
 import io.ktor.server.application.*
 import io.ktor.server.auth.*
+import io.ktor.server.request.*
 import io.ktor.server.routing.*
 
 /**
@@ -62,6 +64,29 @@ fun Application.configureLeaderboardRoutes() {
             }
             
             /**
+             * GET /api/leaderboard/monthly
+             * Get monthly leaderboard (public, no auth required)
+             * Aggregates from daily stats - no separate monthly entries stored
+             * If userId provided or authenticated, includes userRank in response
+             * Query params:
+             *   - monthDate (optional) - YYYY-MM format. Defaults to current month
+             *   - userId (optional) - User ID to get rank for. If not provided, uses authenticated user's ID
+             */
+            get("/monthly") {
+                try {
+                    val monthDate = call.request.queryParameters["monthDate"]
+                    // Priority: query param userId > authenticated userId > null
+                    val currentUserId = call.request.queryParameters["userId"] ?: call.userId
+                    val leaderboard = service.getMonthlyLeaderboard(monthDate, currentUserId)
+                    call.respondApi(leaderboard, "Monthly leaderboard retrieved successfully")
+                } catch (e: IllegalArgumentException) {
+                    call.respondError(HttpStatusCode.BadRequest, e.message ?: "Invalid request")
+                } catch (e: Exception) {
+                    call.respondError(HttpStatusCode.InternalServerError, "Failed to retrieve monthly leaderboard: ${e.message}")
+                }
+            }
+            
+            /**
              * POST /api/leaderboard/sync
              * Sync data from app_usage_events to leaderboardstats
              * Query param: date (optional) - YYYY-MM-DD format. If not provided, syncs all dates
@@ -76,6 +101,39 @@ fun Application.configureLeaderboardRoutes() {
                     call.respondError(HttpStatusCode.BadRequest, e.message ?: "Invalid request")
                 } catch (e: Exception) {
                     call.respondError(HttpStatusCode.InternalServerError, "Failed to sync leaderboard stats: ${e.message}")
+                }
+            }
+            
+            /**
+             * POST /api/leaderboard/stats/update
+             * Directly update leaderboard stats for authenticated user (requires authentication)
+             * Only daily period is supported - weekly and monthly stats are automatically updated in the same call
+             * Request body:
+             *   - period: "daily" only (required)
+             *   - periodDate: YYYY-MM-DD format (required)
+             *   - totalScreenTime: Screen time in milliseconds (required)
+             *   - replace: Boolean, if true replaces existing value, if false adds to existing (default: false)
+             */
+            authenticate("auth-bearer") {
+                post("/stats/update") {
+                    try {
+                        val userId = call.requireUserId()
+                        val request = call.receive<UpdateLeaderboardStatsRequest>()
+                        
+                        val response = service.updateLeaderboardStats(
+                            userId = userId,
+                            period = request.period,
+                            periodDate = request.periodDate,
+                            totalScreenTime = request.totalScreenTime,
+                            replace = request.replace
+                        )
+                        
+                        call.respondApi(response, response.message)
+                    } catch (e: IllegalArgumentException) {
+                        call.respondError(HttpStatusCode.BadRequest, e.message ?: "Invalid request")
+                    } catch (e: Exception) {
+                        call.respondError(HttpStatusCode.InternalServerError, "Failed to update leaderboard stats: ${e.message}")
+                    }
                 }
             }
         }
