@@ -1,5 +1,6 @@
 package com.apptime.code.features
 
+import com.apptime.code.common.MessageKeys
 import com.apptime.code.common.respondApi
 import com.apptime.code.common.respondError
 import com.apptime.code.common.userId
@@ -43,9 +44,9 @@ fun Application.configureFeatureFlagsRoutes() {
                     )
                     
                     val response = service.getFeatureFlagsMap(params)
-                    call.respondApi(response, "Feature flags retrieved successfully")
+                    call.respondApi(response, messageKey = MessageKeys.FEATURE_FLAGS_RETRIEVED)
                 } catch (e: Exception) {
-                    call.respondError(HttpStatusCode.InternalServerError, "Failed to retrieve feature flags: ${e.message}")
+                    call.respondError(HttpStatusCode.InternalServerError, messageKey = MessageKeys.FEATURE_FLAGS_FAILED, message = "Failed to retrieve feature flags: ${e.message}")
                 }
             }
             
@@ -85,14 +86,14 @@ fun Application.configureFeatureFlagsRoutes() {
                             params
                         )
                         val evaluatedFeature = feature.copy(isEnabled = isEnabled)
-                        call.respondApi(evaluatedFeature, "Feature flag retrieved successfully")
+                        call.respondApi(evaluatedFeature, messageKey = MessageKeys.FEATURE_FLAG_RETRIEVED)
                     } else {
-                        call.respondError(HttpStatusCode.NotFound, "Feature flag '$featureName' not found")
+                        call.respondError(HttpStatusCode.NotFound, messageKey = MessageKeys.FEATURE_FLAG_NOT_FOUND, message = "Feature flag '$featureName' not found")
                     }
                 } catch (e: IllegalArgumentException) {
-                    call.respondError(HttpStatusCode.BadRequest, e.message ?: "Invalid request")
+                    call.respondError(HttpStatusCode.BadRequest, messageKey = MessageKeys.INVALID_REQUEST, message = e.message)
                 } catch (e: Exception) {
-                    call.respondError(HttpStatusCode.InternalServerError, "Failed to retrieve feature flag: ${e.message}")
+                    call.respondError(HttpStatusCode.InternalServerError, messageKey = MessageKeys.FEATURE_FLAGS_FAILED, message = "Failed to retrieve feature flag: ${e.message}")
                 }
             }
         }
@@ -106,9 +107,9 @@ fun Application.configureFeatureFlagsRoutes() {
             get {
                 try {
                     val features = service.getAllFeatureFlags()
-                    call.respondApi(features, "Feature flags retrieved successfully")
+                    call.respondApi(features, messageKey = MessageKeys.FEATURE_FLAGS_RETRIEVED)
                 } catch (e: Exception) {
-                    call.respondError(HttpStatusCode.InternalServerError, "Failed to retrieve feature flags: ${e.message}")
+                    call.respondError(HttpStatusCode.InternalServerError, messageKey = MessageKeys.FEATURE_FLAGS_FAILED, message = "Failed to retrieve feature flags: ${e.message}")
                 }
             }
             
@@ -123,14 +124,14 @@ fun Application.configureFeatureFlagsRoutes() {
                     
                     val feature = service.getFeatureFlagByName(featureName)
                     if (feature != null) {
-                        call.respondApi(feature, "Feature flag retrieved successfully")
+                        call.respondApi(feature, messageKey = MessageKeys.FEATURE_FLAG_RETRIEVED)
                     } else {
-                        call.respondError(HttpStatusCode.NotFound, "Feature flag '$featureName' not found")
+                        call.respondError(HttpStatusCode.NotFound, messageKey = MessageKeys.FEATURE_FLAG_NOT_FOUND, message = "Feature flag '$featureName' not found")
                     }
                 } catch (e: IllegalArgumentException) {
-                    call.respondError(HttpStatusCode.BadRequest, e.message ?: "Invalid request")
+                    call.respondError(HttpStatusCode.BadRequest, messageKey = MessageKeys.INVALID_REQUEST, message = e.message)
                 } catch (e: Exception) {
-                    call.respondError(HttpStatusCode.InternalServerError, "Failed to retrieve feature flag: ${e.message}")
+                    call.respondError(HttpStatusCode.InternalServerError, messageKey = MessageKeys.FEATURE_FLAGS_FAILED, message = "Failed to retrieve feature flag: ${e.message}")
                 }
             }
             
@@ -142,11 +143,11 @@ fun Application.configureFeatureFlagsRoutes() {
                 try {
                     val request = call.receive<CreateFeatureFlagRequest>()
                     val feature = service.createFeatureFlag(request)
-                    call.respondApi(feature, "Feature flag created successfully", HttpStatusCode.Created)
+                    call.respondApi(feature, statusCode = HttpStatusCode.Created, messageKey = MessageKeys.FEATURE_FLAG_CREATED)
                 } catch (e: IllegalArgumentException) {
-                    call.respondError(HttpStatusCode.BadRequest, e.message ?: "Invalid request")
+                    call.respondError(HttpStatusCode.BadRequest, messageKey = MessageKeys.INVALID_REQUEST, message = e.message)
                 } catch (e: Exception) {
-                    call.respondError(HttpStatusCode.InternalServerError, "Failed to create feature flag: ${e.message}")
+                    call.respondError(HttpStatusCode.InternalServerError, messageKey = MessageKeys.FEATURE_FLAG_CREATE_FAILED, message = "Failed to create feature flag: ${e.message}")
                 }
             }
             
@@ -160,11 +161,11 @@ fun Application.configureFeatureFlagsRoutes() {
                         ?: throw IllegalArgumentException("Feature name is required")
                     val request = call.receive<UpdateFeatureFlagRequest>()
                     val feature = service.updateFeatureFlag(featureName, request)
-                    call.respondApi(feature, "Feature flag updated successfully")
+                    call.respondApi(feature, messageKey = MessageKeys.FEATURE_FLAG_UPDATED)
                 } catch (e: IllegalArgumentException) {
-                    call.respondError(HttpStatusCode.BadRequest, e.message ?: "Invalid request")
+                    call.respondError(HttpStatusCode.BadRequest, messageKey = MessageKeys.INVALID_REQUEST, message = e.message)
                 } catch (e: Exception) {
-                    call.respondError(HttpStatusCode.InternalServerError, "Failed to update feature flag: ${e.message}")
+                    call.respondError(HttpStatusCode.InternalServerError, messageKey = MessageKeys.FEATURE_FLAG_UPDATE_FAILED, message = "Failed to update feature flag: ${e.message}")
                 }
             }
             
@@ -178,14 +179,14 @@ fun Application.configureFeatureFlagsRoutes() {
                         ?: throw IllegalArgumentException("Feature name is required")
                     val deleted = service.deleteFeatureFlag(featureName)
                     if (deleted) {
-                        call.respondApi("", "Feature flag deleted successfully")
+                        call.respondApi("", messageKey = MessageKeys.FEATURE_FLAG_DELETED)
                     } else {
-                        call.respondError(HttpStatusCode.NotFound, "Feature flag '$featureName' not found")
+                        call.respondError(HttpStatusCode.NotFound, messageKey = MessageKeys.FEATURE_FLAG_NOT_FOUND, message = "Feature flag '$featureName' not found")
                     }
                 } catch (e: IllegalArgumentException) {
-                    call.respondError(HttpStatusCode.BadRequest, e.message ?: "Invalid request")
+                    call.respondError(HttpStatusCode.BadRequest, messageKey = MessageKeys.INVALID_REQUEST, message = e.message)
                 } catch (e: Exception) {
-                    call.respondError(HttpStatusCode.InternalServerError, "Failed to delete feature flag: ${e.message}")
+                    call.respondError(HttpStatusCode.InternalServerError, messageKey = MessageKeys.FEATURE_FLAG_DELETE_FAILED, message = "Failed to delete feature flag: ${e.message}")
                 }
             }
         }

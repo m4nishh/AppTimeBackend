@@ -1,5 +1,6 @@
 package usage
 
+import com.apptime.code.common.MessageKeys
 import com.apptime.code.common.respondApi
 import com.apptime.code.common.respondError
 import com.apptime.code.common.requireUserId
@@ -37,11 +38,11 @@ fun Application.configureAppUsageEventRoutes() {
                         val request = call.receive<AppUsageEventSubmissionRequest>()
                         
                         val event = eventService.submitEvent(userId, request)
-                        call.respondApi(event, "App usage event submitted successfully", HttpStatusCode.Created)
+                        call.respondApi(event, statusCode = HttpStatusCode.Created, messageKey = MessageKeys.USAGE_EVENT_SUBMITTED)
                     } catch (e: IllegalArgumentException) {
-                        call.respondError(HttpStatusCode.BadRequest, e.message ?: "Invalid request")
+                        call.respondError(HttpStatusCode.BadRequest, messageKey = MessageKeys.INVALID_REQUEST, message = e.message)
                     } catch (e: Exception) {
-                        call.respondError(HttpStatusCode.InternalServerError, "Failed to submit event: ${e.message}")
+                        call.respondError(HttpStatusCode.InternalServerError, messageKey = MessageKeys.USAGE_EVENT_FAILED, message = "Failed to submit event: ${e.message}")
                     }
                 }
                 
@@ -58,13 +59,13 @@ fun Application.configureAppUsageEventRoutes() {
                         val events = eventService.submitBatchEvents(userId, request)
                         call.respondApi(
                             BatchAppUsageEventResponse(events = events, count = events.size),
-                            "Batch events submitted successfully",
-                            HttpStatusCode.Created
+                            statusCode = HttpStatusCode.Created,
+                            messageKey = MessageKeys.BATCH_EVENTS_SUBMITTED
                         )
                     } catch (e: IllegalArgumentException) {
-                        call.respondError(HttpStatusCode.BadRequest, e.message ?: "Invalid request")
+                        call.respondError(HttpStatusCode.BadRequest, messageKey = MessageKeys.INVALID_REQUEST, message = e.message)
                     } catch (e: Exception) {
-                        call.respondError(HttpStatusCode.InternalServerError, "Failed to submit batch events: ${e.message}")
+                        call.respondError(HttpStatusCode.InternalServerError, messageKey = MessageKeys.BATCH_EVENTS_FAILED, message = "Failed to submit batch events: ${e.message}")
                     }
                 }
             }
@@ -79,9 +80,9 @@ fun Application.configureAppUsageEventRoutes() {
             get("/users") {
                 try {
                     val allUsersInfo = statsRepository.getAllUserIdsWithData()
-                    call.respondApi(allUsersInfo, "All users with data retrieved")
+                    call.respondApi(allUsersInfo, messageKey = MessageKeys.ALL_USERS_RETRIEVED)
                 } catch (e: Exception) {
-                    call.respondError(HttpStatusCode.InternalServerError, "Failed to get users: ${e.message}")
+                    call.respondError(HttpStatusCode.InternalServerError, messageKey = MessageKeys.ALL_USERS_FAILED, message = "Failed to get users: ${e.message}")
                 }
             }
             
@@ -151,17 +152,18 @@ fun Application.configureAppUsageEventRoutes() {
                                     stats = stats,
                                     session = sessionInfo
                                 ),
-                                "Daily usage stats retrieved successfully. Session expires in ${sessionInfo.remainingMinutes} minutes."
+                                messageKey = MessageKeys.DAILY_STATS_RETRIEVED,
+                                message = "Daily usage stats retrieved successfully. Session expires in ${sessionInfo.remainingMinutes} minutes."
                             )
                         } else {
                             // Return requesting user's own data (no session check needed)
                             val stats = statsService.getDailyUsageStats(requestingUserId, date)
-                            call.respondApi(stats, "Daily usage stats retrieved successfully")
+                            call.respondApi(stats, messageKey = MessageKeys.DAILY_STATS_RETRIEVED)
                         }
                     } catch (e: IllegalArgumentException) {
-                        call.respondError(HttpStatusCode.BadRequest, e.message ?: "Invalid request")
+                        call.respondError(HttpStatusCode.BadRequest, messageKey = MessageKeys.INVALID_REQUEST, message = e.message)
                     } catch (e: Exception) {
-                        call.respondError(HttpStatusCode.InternalServerError, "Failed to retrieve daily usage stats: ${e.message}")
+                        call.respondError(HttpStatusCode.InternalServerError, messageKey = MessageKeys.DAILY_STATS_FAILED, message = "Failed to retrieve daily usage stats: ${e.message}")
                     }
                 }
                 
@@ -177,9 +179,9 @@ fun Application.configureAppUsageEventRoutes() {
                         val date = call.request.queryParameters["date"]
                         
                         val debugInfo = statsRepository.getDebugInfo(userId, date)
-                        call.respondApi(debugInfo, "Debug information retrieved successfully")
+                        call.respondApi(debugInfo, messageKey = MessageKeys.DEBUG_INFO_RETRIEVED)
                     } catch (e: Exception) {
-                        call.respondError(HttpStatusCode.InternalServerError, "Failed to get debug info: ${e.message}")
+                        call.respondError(HttpStatusCode.InternalServerError, messageKey = MessageKeys.DEBUG_INFO_FAILED, message = "Failed to get debug info: ${e.message}")
                     }
                 }
                 
@@ -198,10 +200,10 @@ fun Application.configureAppUsageEventRoutes() {
                                 totalEvents = rawEvents.size,
                                 events = rawEvents
                             ),
-                            "Raw events retrieved successfully"
+                            messageKey = MessageKeys.RAW_EVENTS_RETRIEVED
                         )
                     } catch (e: Exception) {
-                        call.respondError(HttpStatusCode.InternalServerError, "Failed to get raw events: ${e.message}")
+                        call.respondError(HttpStatusCode.InternalServerError, messageKey = MessageKeys.RAW_EVENTS_FAILED, message = "Failed to get raw events: ${e.message}")
                     }
                 }
                 
@@ -214,9 +216,9 @@ fun Application.configureAppUsageEventRoutes() {
                     try {
                         val userId = call.requireUserId()
                         val response = eventStatsService.getLastSyncTime(userId)
-                        call.respondApi(response, "Last sync time retrieved successfully")
+                        call.respondApi(response, messageKey = MessageKeys.LAST_SYNC_RETRIEVED)
                     } catch (e: Exception) {
-                        call.respondError(HttpStatusCode.InternalServerError, "Failed to retrieve last sync time: ${e.message}")
+                        call.respondError(HttpStatusCode.InternalServerError, messageKey = MessageKeys.LAST_SYNC_FAILED, message = "Failed to retrieve last sync time: ${e.message}")
                     }
                 }
                 
@@ -229,9 +231,9 @@ fun Application.configureAppUsageEventRoutes() {
                     try {
                         val userId = call.requireUserId()
                         val response = eventStatsService.deleteUserEvents(userId)
-                        call.respondApi(response, "User events deleted successfully")
+                        call.respondApi(response, messageKey = MessageKeys.USER_EVENTS_DELETED)
                     } catch (e: Exception) {
-                        call.respondError(HttpStatusCode.InternalServerError, "Failed to delete user events: ${e.message}")
+                        call.respondError(HttpStatusCode.InternalServerError, messageKey = MessageKeys.USER_EVENTS_DELETE_FAILED, message = "Failed to delete user events: ${e.message}")
                     }
                 }
             }

@@ -12,6 +12,7 @@ import com.apptime.code.leaderboard.configureLeaderboardRoutes
 import com.apptime.code.location.configureLocationRoutes
 import com.apptime.code.notifications.FirebaseNotificationService
 import com.apptime.code.rewards.configureRewardRoutes
+import com.apptime.code.common.TranslationService
 import users.configureUserRoutes
 import usage.configureAppUsageEventRoutes
 import io.ktor.serialization.kotlinx.json.*
@@ -28,6 +29,13 @@ fun Application.module() {
     
     // Initialize Firebase for push notifications
     FirebaseNotificationService.initialize()
+    
+    // Initialize translation service (loads all translation files)
+    val loadedLanguages = TranslationService.getAvailableLanguages()
+    println("TranslationService initialized. Loaded languages: ${loadedLanguages.joinToString(", ")}")
+    if (loadedLanguages.isEmpty()) {
+        println("WARNING: No translations loaded! Check translation files in src/main/resources/translations/")
+    }
 
     install(ContentNegotiation) {
         json(Json {

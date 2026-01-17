@@ -1,5 +1,6 @@
 package com.apptime.code.challenges
 
+import com.apptime.code.common.MessageKeys
 import com.apptime.code.common.respondApi
 import com.apptime.code.common.respondError
 import com.apptime.code.common.requireUserId
@@ -33,9 +34,9 @@ fun Application.configureChallengeRoutes() {
                 get("/active") {
                     try {
                         val response = service.getActiveChallenges(call.userId)
-                        call.respondApi(response, "Active challenges retrieved successfully")
+                        call.respondApi(response, messageKey = MessageKeys.ACTIVE_CHALLENGES_RETRIEVED)
                     } catch (e: Exception) {
-                        call.respondError(HttpStatusCode.InternalServerError, "Failed to retrieve active challenges: ${e.message}")
+                        call.respondError(HttpStatusCode.InternalServerError, messageKey = MessageKeys.ACTIVE_CHALLENGES_FAILED, message = "Failed to retrieve active challenges: ${e.message}")
                     }
                 }
             }
@@ -68,11 +69,11 @@ fun Application.configureChallengeRoutes() {
                             println("Failed to award participation reward: ${e.message}")
                         }
                         
-                        call.respondApi(response, response.message, HttpStatusCode.Created)
+                        call.respondApi(response, statusCode = HttpStatusCode.Created, message = response.message)
                     } catch (e: IllegalArgumentException) {
-                        call.respondError(HttpStatusCode.BadRequest, e.message ?: "Invalid request")
+                        call.respondError(HttpStatusCode.BadRequest, messageKey = MessageKeys.INVALID_REQUEST, message = e.message)
                     } catch (e: Exception) {
-                        call.respondError(HttpStatusCode.InternalServerError, "Failed to join challenge: ${e.message}")
+                        call.respondError(HttpStatusCode.InternalServerError, messageKey = MessageKeys.CHALLENGE_JOIN_FAILED, message = "Failed to join challenge: ${e.message}")
                     }
                 }
                 
@@ -85,9 +86,9 @@ fun Application.configureChallengeRoutes() {
                     try {
                         val userId = call.requireUserId()
                         val response = service.getUserChallenges(userId)
-                        call.respondApi(response, "User challenges retrieved successfully")
+                        call.respondApi(response, messageKey = MessageKeys.USER_CHALLENGES_RETRIEVED)
                     } catch (e: Exception) {
-                        call.respondError(HttpStatusCode.InternalServerError, "Failed to retrieve user challenges: ${e.message}")
+                        call.respondError(HttpStatusCode.InternalServerError, messageKey = MessageKeys.USER_CHALLENGES_FAILED, message = "Failed to retrieve user challenges: ${e.message}")
                     }
                 }
                 
@@ -104,11 +105,11 @@ fun Application.configureChallengeRoutes() {
                         
                         val userId = call.userId
                         val response = service.getChallengeDetail(challengeId, userId)
-                        call.respondApi(response, "Challenge details retrieved successfully")
+                        call.respondApi(response, messageKey = MessageKeys.CHALLENGE_DETAILS_RETRIEVED)
                     } catch (e: IllegalArgumentException) {
-                        call.respondError(HttpStatusCode.BadRequest, e.message ?: "Invalid request")
+                        call.respondError(HttpStatusCode.BadRequest, messageKey = MessageKeys.INVALID_REQUEST, message = e.message)
                     } catch (e: Exception) {
-                        call.respondError(HttpStatusCode.InternalServerError, "Failed to retrieve challenge details: ${e.message}")
+                        call.respondError(HttpStatusCode.InternalServerError, messageKey = MessageKeys.CHALLENGE_DETAILS_FAILED, message = "Failed to retrieve challenge details: ${e.message}")
                     }
                 }
                 
@@ -132,13 +133,13 @@ fun Application.configureChallengeRoutes() {
                         service.submitChallengeStats(userId, request)
                         call.respondApi(
                             mapOf("message" to "Challenge stats submitted successfully"),
-                            "Challenge stats submitted successfully",
-                            HttpStatusCode.Created
+                            statusCode = HttpStatusCode.Created,
+                            messageKey = MessageKeys.CHALLENGE_STATS_SUBMITTED
                         )
                     } catch (e: IllegalArgumentException) {
-                        call.respondError(HttpStatusCode.BadRequest, e.message ?: "Invalid request")
+                        call.respondError(HttpStatusCode.BadRequest, messageKey = MessageKeys.INVALID_REQUEST, message = e.message)
                     } catch (e: Exception) {
-                        call.respondError(HttpStatusCode.InternalServerError, "Failed to submit challenge stats: ${e.message}")
+                        call.respondError(HttpStatusCode.InternalServerError, messageKey = MessageKeys.CHALLENGE_STATS_FAILED, message = "Failed to submit challenge stats: ${e.message}")
                     }
                 }
                 
@@ -169,11 +170,11 @@ fun Application.configureChallengeRoutes() {
                             request.challengeId,
                             request.stats
                         )
-                        call.respondApi(response, "Challenge stats submitted successfully", HttpStatusCode.Created)
+                        call.respondApi(response, statusCode = HttpStatusCode.Created, messageKey = MessageKeys.CHALLENGE_STATS_SUBMITTED)
                     } catch (e: IllegalArgumentException) {
-                        call.respondError(HttpStatusCode.BadRequest, e.message ?: "Invalid request")
+                        call.respondError(HttpStatusCode.BadRequest, messageKey = MessageKeys.INVALID_REQUEST, message = e.message)
                     } catch (e: Exception) {
-                        call.respondError(HttpStatusCode.InternalServerError, "Failed to submit challenge stats: ${e.message}")
+                        call.respondError(HttpStatusCode.InternalServerError, messageKey = MessageKeys.CHALLENGE_STATS_FAILED, message = "Failed to submit challenge stats: ${e.message}")
                     }
                 }
                 
@@ -193,11 +194,11 @@ fun Application.configureChallengeRoutes() {
                             ?: throw IllegalArgumentException("Invalid challenge ID")
                         
                         val response = service.getChallengeRankings(challengeId, userId)
-                        call.respondApi(response, "Challenge rankings retrieved successfully")
+                        call.respondApi(response, messageKey = MessageKeys.CHALLENGE_RANKINGS_RETRIEVED)
                     } catch (e: IllegalArgumentException) {
-                        call.respondError(HttpStatusCode.BadRequest, e.message ?: "Invalid request")
+                        call.respondError(HttpStatusCode.BadRequest, messageKey = MessageKeys.INVALID_REQUEST, message = e.message)
                     } catch (e: Exception) {
-                        call.respondError(HttpStatusCode.InternalServerError, "Failed to retrieve challenge rankings: ${e.message}")
+                        call.respondError(HttpStatusCode.InternalServerError, messageKey = MessageKeys.CHALLENGE_RANKINGS_FAILED, message = "Failed to retrieve challenge rankings: ${e.message}")
                     }
                 }
                 
@@ -214,11 +215,11 @@ fun Application.configureChallengeRoutes() {
                             ?: throw IllegalArgumentException("Invalid challenge ID")
                         
                         val response = service.getLastSyncTime(userId, challengeId)
-                        call.respondApi(response, "Last sync time retrieved successfully")
+                        call.respondApi(response, messageKey = MessageKeys.CHALLENGE_LAST_SYNC_RETRIEVED)
                     } catch (e: IllegalArgumentException) {
-                        call.respondError(HttpStatusCode.BadRequest, e.message ?: "Invalid request")
+                        call.respondError(HttpStatusCode.BadRequest, messageKey = MessageKeys.INVALID_REQUEST, message = e.message)
                     } catch (e: Exception) {
-                        call.respondError(HttpStatusCode.InternalServerError, "Failed to retrieve last sync time: ${e.message}")
+                        call.respondError(HttpStatusCode.InternalServerError, messageKey = MessageKeys.CHALLENGE_LAST_SYNC_FAILED, message = "Failed to retrieve last sync time: ${e.message}")
                     }
                 }
             }

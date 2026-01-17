@@ -1,9 +1,16 @@
-Current Active Ngrok URL: https://7d76ddc7b74f.ngrok-free.app
+Current Active Ngrok URL: https://f30aa0d35e07.ngrok-free.app
 
 Update your API client to use this URL instead of the old one.
 
 Test command:
 curl -H "ngrok-skip-browser-warning: true" \
   -H "Accept: application/json" \
-  "https://7d76ddc7b74f.ngrok-free.app/api/challenges/active"
+  "https://f30aa0d35e07.ngrok-free.app/health"
 
+API Examples:
+- Health Check: https://f30aa0d35e07.ngrok-free.app/health
+- Active Challenges: https://f30aa0d35e07.ngrok-free.app/api/challenges/active
+- Register User: https://f30aa0d35e07.ngrok-free.app/api/users/register
+
+Note: Free ngrok tunnels expire after 2 hours of inactivity.
+Always include the header "ngrok-skip-browser-warning: true" in your API requests.

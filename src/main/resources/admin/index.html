@@ -531,6 +531,7 @@
                 <button class="tab" onclick="showTab('users')">👥 Users</button>
                 <button class="tab" onclick="showTab('consents')">📝 Consents</button>
                 <button class="tab" onclick="showTab('rewards')">🎁 Rewards</button>
+                <button class="tab" onclick="showTab('orders')">📦 Orders</button>
                 <button class="tab" onclick="showTab('features')">🚩 Feature Flags</button>
             </div>
 
@@ -598,6 +599,28 @@
                     <strong>ℹ️ Note:</strong> Reward catalog items are products that users can redeem with their coins. Admins can create and manage these items.
                 </p>
                 <div id="reward-catalog-content" class="loading">Loading reward catalog...</div>
+            </div>
+        </div>
+
+        <!-- Orders Tab -->
+        <div id="orders" class="tab-content">
+            <div class="section">
+                <div class="section-header">
+                    <h2>Order Management</h2>
+                    <button class="btn btn-primary" onclick="loadOrders()">🔄 Refresh</button>
+                </div>
+                <div style="margin-bottom: 20px;">
+                    <label style="color: var(--text-primary); font-weight: 600; margin-right: 10px;">Filter by Status:</label>
+                    <select id="orderStatusFilter" onchange="loadOrders()" style="padding: 8px 12px; border: 2px solid var(--border-color); border-radius: 8px; background: var(--bg-secondary); color: var(--text-primary); font-size: 1em;">
+                        <option value="">All Orders</option>
+                        <option value="PENDING">Pending</option>
+                        <option value="PROCESSING">Processing</option>
+                        <option value="SHIPPED">Shipped</option>
+                        <option value="DELIVERED">Delivered</option>
+                        <option value="CANCELLED">Cancelled</option>
+                    </select>
+                </div>
+                <div id="orders-content" class="loading">Loading orders...</div>
             </div>
         </div>
 
@@ -812,9 +835,103 @@
                         <input type="checkbox" id="userIsBlocked"> User is Blocked
                     </label>
                 </div>
+                <div class="form-group">
+                    <label>Total Coins</label>
+                    <input type="text" id="userTotalCoins" disabled style="background: #f5f5f5;">
+                </div>
                 <div class="form-actions">
+                    <button type="button" class="btn btn-success" onclick="showAddCoinsModalFromUserModal()">Add Coins</button>
                     <button type="button" class="btn btn-secondary" onclick="closeUserModal()">Cancel</button>
                     <button type="submit" class="btn btn-primary">Save</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Add Coins Modal -->
+    <div id="addCoinsModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="addCoinsModalTitle">Add Coins to User</h3>
+                <button class="close" onclick="closeAddCoinsModal()">&times;</button>
+            </div>
+            <form id="addCoinsForm" onsubmit="saveCoins(event)">
+                <input type="hidden" id="addCoinsUserId">
+                <div class="form-group">
+                    <label>User</label>
+                    <input type="text" id="addCoinsUserDisplay" disabled style="background: #f5f5f5;">
+                </div>
+                <div class="form-group">
+                    <label>Current Coins</label>
+                    <input type="text" id="addCoinsCurrentCoins" disabled style="background: #f5f5f5;">
+                </div>
+                <div class="form-group">
+                    <label>Amount to Add *</label>
+                    <input type="number" id="addCoinsAmount" required min="1" placeholder="Enter coin amount">
+                </div>
+                <div class="form-group">
+                    <label>Description (Optional)</label>
+                    <textarea id="addCoinsDescription" placeholder="e.g., Bonus for participation, Compensation, etc."></textarea>
+                </div>
+                <div class="form-actions">
+                    <button type="button" class="btn btn-secondary" onclick="closeAddCoinsModal()">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Add Coins</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Order Detail Modal -->
+    <div id="orderDetailModal" class="modal">
+        <div class="modal-content" style="max-width: 800px;">
+            <div class="modal-header">
+                <h3 id="orderDetailModalTitle">Order Details</h3>
+                <button class="close" onclick="closeOrderDetailModal()">&times;</button>
+            </div>
+            <div id="orderDetailContent">
+                <!-- Order details will be loaded here -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Update Order Status Modal -->
+    <div id="updateOrderStatusModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="updateOrderStatusModalTitle">Update Order Status</h3>
+                <button class="close" onclick="closeUpdateOrderStatusModal()">&times;</button>
+            </div>
+            <form id="updateOrderStatusForm" onsubmit="saveOrderStatus(event)">
+                <input type="hidden" id="updateOrderStatusId">
+                <div class="form-group">
+                    <label>Order Number</label>
+                    <input type="text" id="updateOrderStatusNumber" disabled style="background: #f5f5f5;">
+                </div>
+                <div class="form-group">
+                    <label>Current Status</label>
+                    <input type="text" id="updateOrderStatusCurrent" disabled style="background: #f5f5f5;">
+                </div>
+                <div class="form-group">
+                    <label>New Status *</label>
+                    <select id="updateOrderStatusNew" required>
+                        <option value="PENDING">Pending</option>
+                        <option value="PROCESSING">Processing</option>
+                        <option value="SHIPPED">Shipped</option>
+                        <option value="DELIVERED">Delivered</option>
+                        <option value="CANCELLED">Cancelled</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Tracking Number (for SHIPPED status)</label>
+                    <input type="text" id="updateOrderStatusTracking" placeholder="Enter tracking number">
+                </div>
+                <div class="form-group">
+                    <label>Admin Notes</label>
+                    <textarea id="updateOrderStatusNotes" placeholder="Add any notes about this order status change"></textarea>
+                </div>
+                <div class="form-actions">
+                    <button type="button" class="btn btn-secondary" onclick="closeUpdateOrderStatusModal()">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Update Status</button>
                 </div>
             </form>
         </div>
@@ -948,6 +1065,7 @@
         let currentEditingReward = null;
         let currentEditingFeature = null;
         let currentEditingRewardCatalog = null;
+        let currentEditingOrder = null;
 
         // Theme Management
         function getTheme() {
@@ -1093,6 +1211,7 @@
                 loadRewards();
                 loadRewardCatalog();
             }
+            if (tabName === 'orders') loadOrders();
             if (tabName === 'features') loadFeatures();
         }
 
@@ -1342,6 +1461,7 @@
                             <th>Username</th>
                             <th>Email</th>
                             <th>Device Model</th>
+                            <th>Coins</th>
                             <th>Status</th>
                             <th>Created</th>
                             <th>Actions</th>
@@ -1361,16 +1481,20 @@
                                 blockButtonHtml = `<button class="btn btn-danger btn-sm" onclick="blockUser('${u.userId}')">Block</button>`;
                             }
                             
+                            const totalCoins = u.totalCoins || 0;
+                            
                             return `
                             <tr>
                                 <td>${u.userId.substring(0, 20)}...</td>
                                 <td>${u.username || 'N/A'}</td>
                                 <td>${u.email || 'N/A'}</td>
                                 <td>${u.deviceModel || 'N/A'}</td>
+                                <td><strong>${totalCoins}</strong> 🪙</td>
                                 <td><span class="badge ${isBlocked ? 'blocked' : 'unblocked'}">${isBlocked ? 'Blocked' : 'Active'}</span></td>
                                 <td>${new Date(u.createdAt).toLocaleDateString()}</td>
                                 <td class="actions">
                                     <button class="btn btn-primary btn-sm" onclick="editUser('${u.userId}')">Edit</button>
+                                    <button class="btn btn-success btn-sm" onclick="showAddCoinsModal('${u.userId}', '${u.username || 'N/A'}', ${totalCoins})">Add Coins</button>
                                     ${blockButtonHtml}
                                     <button class="btn btn-danger btn-sm" onclick="deleteUser('${u.userId}')">Delete</button>
                                 </td>
@@ -1400,12 +1524,71 @@
                 document.getElementById('userDeviceModel').value = user.deviceModel || '';
                 document.getElementById('userTotpEnabled').checked = user.totpEnabled || false;
                 document.getElementById('userIsBlocked').checked = user.isBlocked || false;
+                document.getElementById('userTotalCoins').value = (user.totalCoins || 0) + ' 🪙';
             } else {
                 title.textContent = 'Edit User';
                 form.reset();
                 document.getElementById('userId').value = '';
+                document.getElementById('userTotalCoins').value = '0 🪙';
             }
             modal.classList.add('active');
+        }
+        
+        function showAddCoinsModal(userId, username, currentCoins) {
+            document.getElementById('addCoinsUserId').value = userId;
+            document.getElementById('addCoinsUserDisplay').value = username || userId.substring(0, 20) + '...';
+            document.getElementById('addCoinsCurrentCoins').value = currentCoins + ' 🪙';
+            document.getElementById('addCoinsAmount').value = '';
+            document.getElementById('addCoinsDescription').value = '';
+            document.getElementById('addCoinsModal').classList.add('active');
+        }
+        
+        function showAddCoinsModalFromUserModal() {
+            if (!currentEditingUser) return;
+            const userId = currentEditingUser.userId;
+            const username = currentEditingUser.username || 'N/A';
+            const currentCoins = currentEditingUser.totalCoins || 0;
+            closeUserModal();
+            showAddCoinsModal(userId, username, currentCoins);
+        }
+        
+        function closeAddCoinsModal() {
+            document.getElementById('addCoinsModal').classList.remove('active');
+            document.getElementById('addCoinsForm').reset();
+        }
+        
+        async function saveCoins(event) {
+            event.preventDefault();
+            const userId = document.getElementById('addCoinsUserId').value;
+            const amount = parseInt(document.getElementById('addCoinsAmount').value);
+            const description = document.getElementById('addCoinsDescription').value || null;
+            
+            if (!userId || !amount || amount <= 0) {
+                showMessage('Please enter a valid coin amount');
+                return;
+            }
+            
+            try {
+                const response = await fetch(`${API_BASE}/api/admin/users/${userId}/coins`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        amount: amount,
+                        description: description
+                    })
+                });
+                const result = await response.json();
+                
+                if (result.success) {
+                    showMessage(result.message || `Successfully added ${amount} coins to user`, 'success');
+                    closeAddCoinsModal();
+                    loadUsers();
+                } else {
+                    showMessage(result.message || 'Failed to add coins');
+                }
+            } catch (err) {
+                showMessage(`Error: ${err.message}`);
+            }
         }
 
         function closeUserModal() {
@@ -2063,6 +2246,218 @@
                     loadFeatures();
                 } else {
                     showMessage(result.message || 'Failed to delete feature flag');
+                }
+            } catch (err) {
+                showMessage(`Error: ${err.message}`);
+            }
+        }
+
+        // Orders/Transactions Management
+        async function loadOrders() {
+            try {
+                const statusFilter = document.getElementById('orderStatusFilter').value;
+                let url = `${API_BASE}/api/admin/transactions?limit=100`;
+                if (statusFilter) {
+                    url += `&status=${statusFilter}`;
+                }
+                
+                const response = await fetch(url);
+                const result = await response.json();
+                if (result.success && result.data) {
+                    displayOrders(result.data);
+                } else {
+                    document.getElementById('orders-content').innerHTML = '<p>No orders found.</p>';
+                }
+            } catch (err) {
+                showMessage(`Error loading orders: ${err.message}`);
+                document.getElementById('orders-content').innerHTML = `<p class="error">Error: ${err.message}</p>`;
+            }
+        }
+
+        function displayOrders(orders) {
+            if (orders.length === 0) {
+                document.getElementById('orders-content').innerHTML = '<p>No orders found.</p>';
+                return;
+            }
+            
+            const html = `
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Order #</th>
+                            <th>User ID</th>
+                            <th>Reward</th>
+                            <th>Price</th>
+                            <th>Recipient</th>
+                            <th>Status</th>
+                            <th>Created</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${orders.map(order => {
+                            const statusBadgeClass = {
+                                'PENDING': 'inactive',
+                                'PROCESSING': 'active',
+                                'SHIPPED': 'active',
+                                'DELIVERED': 'active',
+                                'CANCELLED': 'blocked'
+                            }[order.status] || 'inactive';
+                            
+                            return `
+                            <tr>
+                                <td><strong>${order.transactionNumber}</strong></td>
+                                <td>${order.userId.substring(0, 20)}...</td>
+                                <td>${order.rewardTitle}</td>
+                                <td>${order.coinPrice} 🪙</td>
+                                <td>${order.recipientName}</td>
+                                <td><span class="badge ${statusBadgeClass}">${order.status}</span></td>
+                                <td>${new Date(order.createdAt).toLocaleString()}</td>
+                                <td class="actions">
+                                    <button class="btn btn-primary btn-sm" onclick="viewOrder(${order.id})">View</button>
+                                    <button class="btn btn-success btn-sm" onclick="updateOrderStatus(${order.id}, '${order.status}', '${order.transactionNumber}')">Update Status</button>
+                                </td>
+                            </tr>
+                            `;
+                        }).join('')}
+                    </tbody>
+                </table>
+            `;
+            document.getElementById('orders-content').innerHTML = html;
+        }
+
+        async function viewOrder(orderId) {
+            try {
+                const response = await fetch(`${API_BASE}/api/admin/transactions/${orderId}`);
+                const result = await response.json();
+                if (result.success && result.data) {
+                    showOrderDetail(result.data);
+                } else {
+                    showMessage(result.message || 'Failed to load order details');
+                }
+            } catch (err) {
+                showMessage(`Error: ${err.message}`);
+            }
+        }
+
+        function showOrderDetail(order) {
+            currentEditingOrder = order;
+            const modal = document.getElementById('orderDetailModal');
+            const content = document.getElementById('orderDetailContent');
+            
+            const statusBadgeClass = {
+                'PENDING': 'inactive',
+                'PROCESSING': 'active',
+                'SHIPPED': 'active',
+                'DELIVERED': 'active',
+                'CANCELLED': 'blocked'
+            }[order.status] || 'inactive';
+            
+            const html = `
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px;">
+                    <div>
+                        <h4 style="color: var(--text-primary); margin-bottom: 10px; border-bottom: 2px solid var(--border-color); padding-bottom: 5px;">Order Information</h4>
+                        <p><strong>Order Number:</strong> ${order.transactionNumber}</p>
+                        <p><strong>Status:</strong> <span class="badge ${statusBadgeClass}">${order.status}</span></p>
+                        <p><strong>Created:</strong> ${new Date(order.createdAt).toLocaleString()}</p>
+                        <p><strong>Last Updated:</strong> ${new Date(order.updatedAt).toLocaleString()}</p>
+                    </div>
+                    <div>
+                        <h4 style="color: var(--text-primary); margin-bottom: 10px; border-bottom: 2px solid var(--border-color); padding-bottom: 5px;">Reward Details</h4>
+                        <p><strong>Reward:</strong> ${order.rewardTitle}</p>
+                        <p><strong>Price:</strong> ${order.coinPrice} 🪙</p>
+                        <p><strong>Catalog ID:</strong> ${order.rewardCatalogId}</p>
+                    </div>
+                </div>
+                
+                <div style="margin-bottom: 20px;">
+                    <h4 style="color: var(--text-primary); margin-bottom: 10px; border-bottom: 2px solid var(--border-color); padding-bottom: 5px;">Recipient Information</h4>
+                    <p><strong>Name:</strong> ${order.recipientName}</p>
+                    ${order.recipientEmail ? `<p><strong>Email:</strong> ${order.recipientEmail}</p>` : ''}
+                    ${order.recipientPhone ? `<p><strong>Phone:</strong> ${order.recipientPhone}</p>` : ''}
+                </div>
+                
+                ${order.shippingAddress ? `
+                <div style="margin-bottom: 20px;">
+                    <h4 style="color: var(--text-primary); margin-bottom: 10px; border-bottom: 2px solid var(--border-color); padding-bottom: 5px;">Shipping Address</h4>
+                    <p>${order.shippingAddress}</p>
+                    ${order.city ? `<p>${order.city}${order.state ? `, ${order.state}` : ''}${order.postalCode ? ` ${order.postalCode}` : ''}</p>` : ''}
+                    ${order.country ? `<p>${order.country}</p>` : ''}
+                </div>
+                ` : ''}
+                
+                <div style="margin-bottom: 20px;">
+                    <h4 style="color: var(--text-primary); margin-bottom: 10px; border-bottom: 2px solid var(--border-color); padding-bottom: 5px;">Admin Information</h4>
+                    ${order.trackingNumber ? `<p><strong>Tracking Number:</strong> ${order.trackingNumber}</p>` : '<p><strong>Tracking Number:</strong> Not provided</p>'}
+                    ${order.shippedAt ? `<p><strong>Shipped At:</strong> ${new Date(order.shippedAt).toLocaleString()}</p>` : ''}
+                    ${order.deliveredAt ? `<p><strong>Delivered At:</strong> ${new Date(order.deliveredAt).toLocaleString()}</p>` : ''}
+                    ${order.adminNotes ? `<p><strong>Admin Notes:</strong> ${order.adminNotes}</p>` : '<p><strong>Admin Notes:</strong> None</p>'}
+                </div>
+                
+                <div style="margin-top: 20px;">
+                    <button class="btn btn-success" onclick="updateOrderStatus(${order.id}, '${order.status}', '${order.transactionNumber}'); closeOrderDetailModal();">Update Status</button>
+                    <button class="btn btn-secondary" onclick="closeOrderDetailModal()">Close</button>
+                </div>
+            `;
+            
+            content.innerHTML = html;
+            modal.classList.add('active');
+        }
+
+        function closeOrderDetailModal() {
+            document.getElementById('orderDetailModal').classList.remove('active');
+            currentEditingOrder = null;
+        }
+
+        function updateOrderStatus(orderId, currentStatus, transactionNumber) {
+            currentEditingOrder = { id: orderId, status: currentStatus, transactionNumber: transactionNumber };
+            const modal = document.getElementById('updateOrderStatusModal');
+            
+            document.getElementById('updateOrderStatusId').value = orderId;
+            document.getElementById('updateOrderStatusNumber').value = transactionNumber;
+            document.getElementById('updateOrderStatusCurrent').value = currentStatus;
+            document.getElementById('updateOrderStatusNew').value = currentStatus;
+            document.getElementById('updateOrderStatusTracking').value = '';
+            document.getElementById('updateOrderStatusNotes').value = '';
+            
+            modal.classList.add('active');
+        }
+
+        function closeUpdateOrderStatusModal() {
+            document.getElementById('updateOrderStatusModal').classList.remove('active');
+            currentEditingOrder = null;
+        }
+
+        async function saveOrderStatus(event) {
+            event.preventDefault();
+            const orderId = document.getElementById('updateOrderStatusId').value;
+            const newStatus = document.getElementById('updateOrderStatusNew').value;
+            const trackingNumber = document.getElementById('updateOrderStatusTracking').value || null;
+            const adminNotes = document.getElementById('updateOrderStatusNotes').value || null;
+            
+            if (!orderId || !newStatus) {
+                showMessage('Please select a status');
+                return;
+            }
+            
+            try {
+                const response = await fetch(`${API_BASE}/api/admin/transactions/${orderId}/status`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        status: newStatus,
+                        trackingNumber: trackingNumber,
+                        adminNotes: adminNotes
+                    })
+                });
+                const result = await response.json();
+                
+                if (result.success) {
+                    showMessage(result.message || 'Order status updated successfully', 'success');
+                    closeUpdateOrderStatusModal();
+                    loadOrders();
+                } else {
+                    showMessage(result.message || 'Failed to update order status');
                 }
             } catch (err) {
                 showMessage(`Error: ${err.message}`);

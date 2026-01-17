@@ -1,11 +1,14 @@
 package com.apptime.code.admin
 
 import com.apptime.code.common.EnvLoader
+import com.apptime.code.common.MessageKeys
 import com.apptime.code.common.respondApi
 import com.apptime.code.common.respondError
 import com.apptime.code.rewards.RewardService
 import com.apptime.code.rewards.RewardRepository
 import com.apptime.code.rewards.TransactionStatus
+import com.apptime.code.rewards.CoinSource
+import com.apptime.code.rewards.AddCoinsRequest
 import io.ktor.http.*
 import io.ktor.server.application.*
 import io.ktor.server.request.*
@@ -38,12 +41,12 @@ fun Application.configureAdminRoutes() {
                         // Generate a simple session token
                         val sessionToken = UUID.randomUUID().toString()
                         val loginResponse = AdminLoginResponse(token = sessionToken)
-                        call.respondApi(loginResponse, "Login successful")
+                        call.respondApi(loginResponse, messageKey = MessageKeys.ADMIN_LOGIN_SUCCESS)
                     } else {
-                        call.respondError(HttpStatusCode.Unauthorized, "Invalid username or password")
+                        call.respondError(HttpStatusCode.Unauthorized, messageKey = MessageKeys.ADMIN_LOGIN_INVALID)
                     }
                 } catch (e: Exception) {
-                    call.respondError(HttpStatusCode.BadRequest, "Invalid request: ${e.message}")
+                    call.respondError(HttpStatusCode.BadRequest, messageKey = MessageKeys.INVALID_REQUEST, message = "Invalid request: ${e.message}")
                 }
             }
             
@@ -58,12 +61,12 @@ fun Application.configureAdminRoutes() {
                     // In production, you should validate tokens properly
                     if (request.token.isNotBlank()) {
                         val verifyResponse = AdminVerifyResponse(valid = true)
-                        call.respondApi(verifyResponse, "Token is valid")
+                        call.respondApi(verifyResponse, messageKey = MessageKeys.ADMIN_TOKEN_VALID)
                     } else {
-                        call.respondError(HttpStatusCode.Unauthorized, "Invalid token")
+                        call.respondError(HttpStatusCode.Unauthorized, messageKey = MessageKeys.ADMIN_TOKEN_INVALID)
                     }
                 } catch (e: Exception) {
-                    call.respondError(HttpStatusCode.BadRequest, "Invalid request: ${e.message}")
+                    call.respondError(HttpStatusCode.BadRequest, messageKey = MessageKeys.INVALID_REQUEST, message = "Invalid request: ${e.message}")
                 }
             }
             
@@ -74,9 +77,9 @@ fun Application.configureAdminRoutes() {
             get("/stats") {
                 try {
                     val stats = statsService.getAdminStats()
-                    call.respondApi(stats, "Admin statistics retrieved successfully")
+                    call.respondApi(stats, messageKey = MessageKeys.ADMIN_STATS_RETRIEVED)
                 } catch (e: Exception) {
-                    call.respondError(HttpStatusCode.InternalServerError, "Failed to retrieve admin statistics: ${e.message}")
+                    call.respondError(HttpStatusCode.InternalServerError, messageKey = MessageKeys.ADMIN_STATS_FAILED, message = "Failed to retrieve admin statistics: ${e.message}")
                 }
             }
             
@@ -86,9 +89,9 @@ fun Application.configureAdminRoutes() {
                 get {
                     try {
                         val challenges = adminRepository.getAllChallenges()
-                        call.respondApi(challenges, "Challenges retrieved successfully")
+                        call.respondApi(challenges, messageKey = MessageKeys.CHALLENGES_RETRIEVED)
                     } catch (e: Exception) {
-                        call.respondError(HttpStatusCode.InternalServerError, "Failed to retrieve challenges: ${e.message}")
+                        call.respondError(HttpStatusCode.InternalServerError, messageKey = MessageKeys.CHALLENGES_FAILED, message = "Failed to retrieve challenges: ${e.message}")
                     }
                 }
                 
@@ -99,14 +102,14 @@ fun Application.configureAdminRoutes() {
                             ?: throw IllegalArgumentException("Invalid challenge ID")
                         val challenge = adminRepository.getChallengeById(id)
                         if (challenge != null) {
-                            call.respondApi(challenge, "Challenge retrieved successfully")
+                            call.respondApi(challenge, messageKey = MessageKeys.CHALLENGE_RETRIEVED)
                         } else {
-                            call.respondError(HttpStatusCode.NotFound, "Challenge not found")
+                            call.respondError(HttpStatusCode.NotFound, messageKey = MessageKeys.CHALLENGE_NOT_FOUND)
                         }
                     } catch (e: IllegalArgumentException) {
-                        call.respondError(HttpStatusCode.BadRequest, e.message ?: "Invalid request")
+                        call.respondError(HttpStatusCode.BadRequest, messageKey = MessageKeys.INVALID_REQUEST, message = e.message)
                     } catch (e: Exception) {
-                        call.respondError(HttpStatusCode.InternalServerError, "Failed to retrieve challenge: ${e.message}")
+                        call.respondError(HttpStatusCode.InternalServerError, messageKey = MessageKeys.CHALLENGES_FAILED, message = "Failed to retrieve challenge: ${e.message}")
                     }
                 }
                 
@@ -116,11 +119,11 @@ fun Application.configureAdminRoutes() {
                         val request = call.receive<CreateChallengeRequest>()
                         val id = adminRepository.createChallenge(request)
                         val challenge = adminRepository.getChallengeById(id)
-                        call.respondApi(challenge, "Challenge created successfully", HttpStatusCode.Created)
+                        call.respondApi(challenge, statusCode = HttpStatusCode.Created, messageKey = MessageKeys.CHALLENGE_CREATED)
                     } catch (e: IllegalArgumentException) {
-                        call.respondError(HttpStatusCode.BadRequest, e.message ?: "Invalid request")
+                        call.respondError(HttpStatusCode.BadRequest, messageKey = MessageKeys.INVALID_REQUEST, message = e.message)
                     } catch (e: Exception) {
-                        call.respondError(HttpStatusCode.InternalServerError, "Failed to create challenge: ${e.message}")
+                        call.respondError(HttpStatusCode.InternalServerError, messageKey = MessageKeys.CHALLENGES_FAILED, message = "Failed to create challenge: ${e.message}")
                     }
                 }
                 
@@ -133,14 +136,14 @@ fun Application.configureAdminRoutes() {
                         val updated = adminRepository.updateChallenge(id, request)
                         if (updated) {
                             val challenge = adminRepository.getChallengeById(id)
-                            call.respondApi(challenge, "Challenge updated successfully")
+                            call.respondApi(challenge, messageKey = MessageKeys.CHALLENGE_UPDATED)
                         } else {
-                            call.respondError(HttpStatusCode.NotFound, "Challenge not found")
+                            call.respondError(HttpStatusCode.NotFound, messageKey = MessageKeys.CHALLENGE_NOT_FOUND)
                         }
                     } catch (e: IllegalArgumentException) {
-                        call.respondError(HttpStatusCode.BadRequest, e.message ?: "Invalid request")
+                        call.respondError(HttpStatusCode.BadRequest, messageKey = MessageKeys.INVALID_REQUEST, message = e.message)
                     } catch (e: Exception) {
-                        call.respondError(HttpStatusCode.InternalServerError, "Failed to update challenge: ${e.message}")
+                        call.respondError(HttpStatusCode.InternalServerError, messageKey = MessageKeys.CHALLENGES_FAILED, message = "Failed to update challenge: ${e.message}")
                     }
                 }
                 
@@ -151,14 +154,14 @@ fun Application.configureAdminRoutes() {
                             ?: throw IllegalArgumentException("Invalid challenge ID")
                         val deleted = adminRepository.deleteChallenge(id)
                         if (deleted) {
-                            call.respondApi("", "Challenge deleted successfully")
+                            call.respondApi("", messageKey = MessageKeys.CHALLENGE_DELETED)
                         } else {
-                            call.respondError(HttpStatusCode.NotFound, "Challenge not found")
+                            call.respondError(HttpStatusCode.NotFound, messageKey = MessageKeys.CHALLENGE_NOT_FOUND)
                         }
                     } catch (e: IllegalArgumentException) {
-                        call.respondError(HttpStatusCode.BadRequest, e.message ?: "Invalid request")
+                        call.respondError(HttpStatusCode.BadRequest, messageKey = MessageKeys.INVALID_REQUEST, message = e.message)
                     } catch (e: Exception) {
-                        call.respondError(HttpStatusCode.InternalServerError, "Failed to delete challenge: ${e.message}")
+                        call.respondError(HttpStatusCode.InternalServerError, messageKey = MessageKeys.CHALLENGES_FAILED, message = "Failed to delete challenge: ${e.message}")
                     }
                 }
             }
@@ -171,9 +174,9 @@ fun Application.configureAdminRoutes() {
                         val limit = call.request.queryParameters["limit"]?.toIntOrNull() ?: 100
                         val offset = call.request.queryParameters["offset"]?.toIntOrNull() ?: 0
                         val users = adminRepository.getAllUsers(limit, offset)
-                        call.respondApi(users, "Users retrieved successfully")
+                        call.respondApi(users, messageKey = MessageKeys.USERS_RETRIEVED)
                     } catch (e: Exception) {
-                        call.respondError(HttpStatusCode.InternalServerError, "Failed to retrieve users: ${e.message}")
+                        call.respondError(HttpStatusCode.InternalServerError, messageKey = MessageKeys.USERS_FAILED, message = "Failed to retrieve users: ${e.message}")
                     }
                 }
                 
@@ -184,14 +187,14 @@ fun Application.configureAdminRoutes() {
                             ?: throw IllegalArgumentException("Invalid user ID")
                         val user = adminRepository.getUserById(userId)
                         if (user != null) {
-                            call.respondApi(user, "User retrieved successfully")
+                            call.respondApi(user, messageKey = MessageKeys.USER_RETRIEVED)
                         } else {
-                            call.respondError(HttpStatusCode.NotFound, "User not found")
+                            call.respondError(HttpStatusCode.NotFound, messageKey = MessageKeys.USER_NOT_FOUND)
                         }
                     } catch (e: IllegalArgumentException) {
-                        call.respondError(HttpStatusCode.BadRequest, e.message ?: "Invalid request")
+                        call.respondError(HttpStatusCode.BadRequest, messageKey = MessageKeys.INVALID_REQUEST, message = e.message)
                     } catch (e: Exception) {
-                        call.respondError(HttpStatusCode.InternalServerError, "Failed to retrieve user: ${e.message}")
+                        call.respondError(HttpStatusCode.InternalServerError, messageKey = MessageKeys.USERS_FAILED, message = "Failed to retrieve user: ${e.message}")
                     }
                 }
                 
@@ -204,14 +207,14 @@ fun Application.configureAdminRoutes() {
                         val updated = adminRepository.updateUser(userId, request)
                         if (updated) {
                             val user = adminRepository.getUserById(userId)
-                            call.respondApi(user, "User updated successfully")
+                            call.respondApi(user, messageKey = MessageKeys.USER_UPDATED)
                         } else {
-                            call.respondError(HttpStatusCode.NotFound, "User not found")
+                            call.respondError(HttpStatusCode.NotFound, messageKey = MessageKeys.USER_NOT_FOUND)
                         }
                     } catch (e: IllegalArgumentException) {
-                        call.respondError(HttpStatusCode.BadRequest, e.message ?: "Invalid request")
+                        call.respondError(HttpStatusCode.BadRequest, messageKey = MessageKeys.INVALID_REQUEST, message = e.message)
                     } catch (e: Exception) {
-                        call.respondError(HttpStatusCode.InternalServerError, "Failed to update user: ${e.message}")
+                        call.respondError(HttpStatusCode.InternalServerError, messageKey = MessageKeys.USERS_FAILED, message = "Failed to update user: ${e.message}")
                     }
                 }
                 
@@ -223,14 +226,14 @@ fun Application.configureAdminRoutes() {
                         val blocked = adminRepository.blockUser(userId)
                         if (blocked) {
                             val user = adminRepository.getUserById(userId)
-                            call.respondApi(user, "User blocked successfully")
+                            call.respondApi(user, messageKey = MessageKeys.USER_BLOCKED)
                         } else {
-                            call.respondError(HttpStatusCode.NotFound, "User not found")
+                            call.respondError(HttpStatusCode.NotFound, messageKey = MessageKeys.USER_NOT_FOUND)
                         }
                     } catch (e: IllegalArgumentException) {
-                        call.respondError(HttpStatusCode.BadRequest, e.message ?: "Invalid request")
+                        call.respondError(HttpStatusCode.BadRequest, messageKey = MessageKeys.INVALID_REQUEST, message = e.message)
                     } catch (e: Exception) {
-                        call.respondError(HttpStatusCode.InternalServerError, "Failed to block user: ${e.message}")
+                        call.respondError(HttpStatusCode.InternalServerError, messageKey = MessageKeys.USERS_FAILED, message = "Failed to block user: ${e.message}")
                     }
                 }
                 
@@ -242,14 +245,14 @@ fun Application.configureAdminRoutes() {
                         val unblocked = adminRepository.unblockUser(userId)
                         if (unblocked) {
                             val user = adminRepository.getUserById(userId)
-                            call.respondApi(user, "User unblocked successfully")
+                            call.respondApi(user, messageKey = MessageKeys.USER_UNBLOCKED)
                         } else {
-                            call.respondError(HttpStatusCode.NotFound, "User not found")
+                            call.respondError(HttpStatusCode.NotFound, messageKey = MessageKeys.USER_NOT_FOUND)
                         }
                     } catch (e: IllegalArgumentException) {
-                        call.respondError(HttpStatusCode.BadRequest, e.message ?: "Invalid request")
+                        call.respondError(HttpStatusCode.BadRequest, messageKey = MessageKeys.INVALID_REQUEST, message = e.message)
                     } catch (e: Exception) {
-                        call.respondError(HttpStatusCode.InternalServerError, "Failed to unblock user: ${e.message}")
+                        call.respondError(HttpStatusCode.InternalServerError, messageKey = MessageKeys.USERS_FAILED, message = "Failed to unblock user: ${e.message}")
                     }
                 }
                 
@@ -260,14 +263,53 @@ fun Application.configureAdminRoutes() {
                             ?: throw IllegalArgumentException("Invalid user ID")
                         val deleted = adminRepository.deleteUser(userId)
                         if (deleted) {
-                            call.respondApi("", "User deleted successfully")
+                            call.respondApi("", messageKey = MessageKeys.USER_DELETED)
                         } else {
-                            call.respondError(HttpStatusCode.NotFound, "User not found")
+                            call.respondError(HttpStatusCode.NotFound, messageKey = MessageKeys.USER_NOT_FOUND)
                         }
                     } catch (e: IllegalArgumentException) {
-                        call.respondError(HttpStatusCode.BadRequest, e.message ?: "Invalid request")
+                        call.respondError(HttpStatusCode.BadRequest, messageKey = MessageKeys.INVALID_REQUEST, message = e.message)
                     } catch (e: Exception) {
-                        call.respondError(HttpStatusCode.InternalServerError, "Failed to delete user: ${e.message}")
+                        call.respondError(HttpStatusCode.InternalServerError, messageKey = MessageKeys.USERS_FAILED, message = "Failed to delete user: ${e.message}")
+                    }
+                }
+                
+                // Add coins to user
+                post("/{userId}/coins") {
+                    try {
+                        val userId = call.parameters["userId"]
+                            ?: throw IllegalArgumentException("Invalid user ID")
+                        val request = call.receive<AddCoinsToUserRequest>()
+                        
+                        // Validate amount
+                        if (request.amount <= 0) {
+                            throw IllegalArgumentException("Coin amount must be greater than 0")
+                        }
+                        
+                        // Verify user exists
+                        val user = adminRepository.getUserById(userId)
+                        if (user == null) {
+                            call.respondError(HttpStatusCode.NotFound, messageKey = MessageKeys.USER_NOT_FOUND)
+                            return@post
+                        }
+                        
+                        // Add coins using RewardService
+                        val addCoinsRequest = AddCoinsRequest(
+                            userId = userId,
+                            amount = request.amount,
+                            source = CoinSource.ADMIN_GRANT.name,
+                            description = request.description ?: "Admin granted coins"
+                        )
+                        
+                        val coin = rewardService.addCoins(addCoinsRequest)
+                        
+                        // Get updated user with new coin balance
+                        val updatedUser = adminRepository.getUserById(userId)
+                        call.respondApi(updatedUser, statusCode = HttpStatusCode.Created, messageKey = MessageKeys.COINS_ADDED)
+                    } catch (e: IllegalArgumentException) {
+                        call.respondError(HttpStatusCode.BadRequest, messageKey = MessageKeys.INVALID_REQUEST, message = e.message)
+                    } catch (e: Exception) {
+                        call.respondError(HttpStatusCode.InternalServerError, messageKey = MessageKeys.USERS_FAILED, message = "Failed to add coins: ${e.message}")
                     }
                 }
             }
@@ -280,9 +322,9 @@ fun Application.configureAdminRoutes() {
                         val limit = call.request.queryParameters["limit"]?.toIntOrNull() ?: 100
                         val offset = call.request.queryParameters["offset"]?.toIntOrNull() ?: 0
                         val rewards = adminRepository.getAllRewards(limit, offset)
-                        call.respondApi(rewards, "Rewards retrieved successfully")
+                        call.respondApi(rewards, messageKey = MessageKeys.REWARDS_RETRIEVED)
                     } catch (e: Exception) {
-                        call.respondError(HttpStatusCode.InternalServerError, "Failed to retrieve rewards: ${e.message}")
+                        call.respondError(HttpStatusCode.InternalServerError, messageKey = MessageKeys.REWARDS_FAILED, message = "Failed to retrieve rewards: ${e.message}")
                     }
                 }
                 
@@ -293,14 +335,14 @@ fun Application.configureAdminRoutes() {
                             ?: throw IllegalArgumentException("Invalid reward ID")
                         val reward = adminRepository.getRewardById(id)
                         if (reward != null) {
-                            call.respondApi(reward, "Reward retrieved successfully")
+                            call.respondApi(reward, messageKey = MessageKeys.REWARD_RETRIEVED)
                         } else {
-                            call.respondError(HttpStatusCode.NotFound, "Reward not found")
+                            call.respondError(HttpStatusCode.NotFound, messageKey = MessageKeys.REWARD_NOT_FOUND)
                         }
                     } catch (e: IllegalArgumentException) {
-                        call.respondError(HttpStatusCode.BadRequest, e.message ?: "Invalid request")
+                        call.respondError(HttpStatusCode.BadRequest, messageKey = MessageKeys.INVALID_REQUEST, message = e.message)
                     } catch (e: Exception) {
-                        call.respondError(HttpStatusCode.InternalServerError, "Failed to retrieve reward: ${e.message}")
+                        call.respondError(HttpStatusCode.InternalServerError, messageKey = MessageKeys.REWARDS_FAILED, message = "Failed to retrieve reward: ${e.message}")
                     }
                 }
                 
@@ -314,9 +356,9 @@ fun Application.configureAdminRoutes() {
                 get {
                     try {
                         val templates = adminRepository.getAllConsentTemplates()
-                        call.respondApi(templates, "Consent templates retrieved successfully")
+                        call.respondApi(templates, messageKey = MessageKeys.CONSENT_TEMPLATES_RETRIEVED)
                     } catch (e: Exception) {
-                        call.respondError(HttpStatusCode.InternalServerError, "Failed to retrieve consent templates: ${e.message}")
+                        call.respondError(HttpStatusCode.InternalServerError, messageKey = MessageKeys.CONSENT_TEMPLATES_FAILED, message = "Failed to retrieve consent templates: ${e.message}")
                     }
                 }
                 
@@ -327,14 +369,14 @@ fun Application.configureAdminRoutes() {
                             ?: throw IllegalArgumentException("Invalid consent template ID")
                         val template = adminRepository.getConsentTemplateById(id)
                         if (template != null) {
-                            call.respondApi(template, "Consent template retrieved successfully")
+                            call.respondApi(template, messageKey = MessageKeys.CONSENT_TEMPLATE_RETRIEVED)
                         } else {
-                            call.respondError(HttpStatusCode.NotFound, "Consent template not found")
+                            call.respondError(HttpStatusCode.NotFound, messageKey = MessageKeys.CONSENT_TEMPLATE_NOT_FOUND)
                         }
                     } catch (e: IllegalArgumentException) {
-                        call.respondError(HttpStatusCode.BadRequest, e.message ?: "Invalid request")
+                        call.respondError(HttpStatusCode.BadRequest, messageKey = MessageKeys.INVALID_REQUEST, message = e.message)
                     } catch (e: Exception) {
-                        call.respondError(HttpStatusCode.InternalServerError, "Failed to retrieve consent template: ${e.message}")
+                        call.respondError(HttpStatusCode.InternalServerError, messageKey = MessageKeys.CONSENT_TEMPLATES_FAILED, message = "Failed to retrieve consent template: ${e.message}")
                     }
                 }
                 
@@ -344,11 +386,11 @@ fun Application.configureAdminRoutes() {
                         val request = call.receive<CreateConsentTemplateRequest>()
                         val id = adminRepository.createConsentTemplate(request)
                         val template = adminRepository.getConsentTemplateById(id)
-                        call.respondApi(template, "Consent template created successfully", HttpStatusCode.Created)
+                        call.respondApi(template, statusCode = HttpStatusCode.Created, messageKey = MessageKeys.CONSENT_TEMPLATE_CREATED)
                     } catch (e: IllegalArgumentException) {
-                        call.respondError(HttpStatusCode.BadRequest, e.message ?: "Invalid request")
+                        call.respondError(HttpStatusCode.BadRequest, messageKey = MessageKeys.INVALID_REQUEST, message = e.message)
                     } catch (e: Exception) {
-                        call.respondError(HttpStatusCode.InternalServerError, "Failed to create consent template: ${e.message}")
+                        call.respondError(HttpStatusCode.InternalServerError, messageKey = MessageKeys.CONSENT_TEMPLATES_FAILED, message = "Failed to create consent template: ${e.message}")
                     }
                 }
                 
@@ -361,14 +403,14 @@ fun Application.configureAdminRoutes() {
                         val updated = adminRepository.updateConsentTemplate(id, request)
                         if (updated) {
                             val template = adminRepository.getConsentTemplateById(id)
-                            call.respondApi(template, "Consent template updated successfully")
+                            call.respondApi(template, messageKey = MessageKeys.CONSENT_TEMPLATE_UPDATED)
                         } else {
-                            call.respondError(HttpStatusCode.NotFound, "Consent template not found")
+                            call.respondError(HttpStatusCode.NotFound, messageKey = MessageKeys.CONSENT_TEMPLATE_NOT_FOUND)
                         }
                     } catch (e: IllegalArgumentException) {
-                        call.respondError(HttpStatusCode.BadRequest, e.message ?: "Invalid request")
+                        call.respondError(HttpStatusCode.BadRequest, messageKey = MessageKeys.INVALID_REQUEST, message = e.message)
                     } catch (e: Exception) {
-                        call.respondError(HttpStatusCode.InternalServerError, "Failed to update consent template: ${e.message}")
+                        call.respondError(HttpStatusCode.InternalServerError, messageKey = MessageKeys.CONSENT_TEMPLATES_FAILED, message = "Failed to update consent template: ${e.message}")
                     }
                 }
                 
@@ -379,14 +421,14 @@ fun Application.configureAdminRoutes() {
                             ?: throw IllegalArgumentException("Invalid consent template ID")
                         val deleted = adminRepository.deleteConsentTemplate(id)
                         if (deleted) {
-                            call.respondApi("", "Consent template deleted successfully")
+                            call.respondApi("", messageKey = MessageKeys.CONSENT_TEMPLATE_DELETED)
                         } else {
-                            call.respondError(HttpStatusCode.NotFound, "Consent template not found")
+                            call.respondError(HttpStatusCode.NotFound, messageKey = MessageKeys.CONSENT_TEMPLATE_NOT_FOUND)
                         }
                     } catch (e: IllegalArgumentException) {
-                        call.respondError(HttpStatusCode.BadRequest, e.message ?: "Invalid request")
+                        call.respondError(HttpStatusCode.BadRequest, messageKey = MessageKeys.INVALID_REQUEST, message = e.message)
                     } catch (e: Exception) {
-                        call.respondError(HttpStatusCode.InternalServerError, "Failed to delete consent template: ${e.message}")
+                        call.respondError(HttpStatusCode.InternalServerError, messageKey = MessageKeys.CONSENT_TEMPLATES_FAILED, message = "Failed to delete consent template: ${e.message}")
                     }
                 }
             }
@@ -398,9 +440,9 @@ fun Application.configureAdminRoutes() {
                     try {
                         val category = call.request.queryParameters["category"]
                         val catalogItems = rewardService.getActiveRewardCatalog(category)
-                        call.respondApi(catalogItems, "Reward catalog retrieved successfully")
+                        call.respondApi(catalogItems, messageKey = MessageKeys.CATALOG_RETRIEVED)
                     } catch (e: Exception) {
-                        call.respondError(HttpStatusCode.InternalServerError, "Failed to retrieve catalog: ${e.message}")
+                        call.respondError(HttpStatusCode.InternalServerError, messageKey = MessageKeys.CATALOG_FAILED, message = "Failed to retrieve catalog: ${e.message}")
                     }
                 }
                 
@@ -411,11 +453,11 @@ fun Application.configureAdminRoutes() {
                             ?: throw IllegalArgumentException("Invalid catalog ID")
                         val catalogItem = rewardService.getRewardCatalogById(id)
                             ?: throw IllegalArgumentException("Catalog item not found")
-                        call.respondApi(catalogItem, "Catalog item retrieved successfully")
+                        call.respondApi(catalogItem, messageKey = MessageKeys.CATALOG_ITEM_RETRIEVED)
                     } catch (e: IllegalArgumentException) {
-                        call.respondError(HttpStatusCode.BadRequest, e.message ?: "Invalid request")
+                        call.respondError(HttpStatusCode.BadRequest, messageKey = MessageKeys.INVALID_REQUEST, message = e.message)
                     } catch (e: Exception) {
-                        call.respondError(HttpStatusCode.InternalServerError, "Failed to retrieve catalog item: ${e.message}")
+                        call.respondError(HttpStatusCode.InternalServerError, messageKey = MessageKeys.CATALOG_FAILED, message = "Failed to retrieve catalog item: ${e.message}")
                     }
                 }
                 
@@ -424,11 +466,11 @@ fun Application.configureAdminRoutes() {
                     try {
                         val request = call.receive<com.apptime.code.rewards.CreateRewardCatalogRequest>()
                         val catalogItem = rewardService.createRewardCatalogItem(request)
-                        call.respondApi(catalogItem, "Catalog item created successfully", HttpStatusCode.Created)
+                        call.respondApi(catalogItem, statusCode = HttpStatusCode.Created, messageKey = MessageKeys.CATALOG_ITEM_CREATED)
                     } catch (e: IllegalArgumentException) {
-                        call.respondError(HttpStatusCode.BadRequest, e.message ?: "Invalid request")
+                        call.respondError(HttpStatusCode.BadRequest, messageKey = MessageKeys.INVALID_REQUEST, message = e.message)
                     } catch (e: Exception) {
-                        call.respondError(HttpStatusCode.InternalServerError, "Failed to create catalog item: ${e.message}")
+                        call.respondError(HttpStatusCode.InternalServerError, messageKey = MessageKeys.CATALOG_FAILED, message = "Failed to create catalog item: ${e.message}")
                     }
                 }
                 
@@ -439,11 +481,11 @@ fun Application.configureAdminRoutes() {
                             ?: throw IllegalArgumentException("Invalid catalog ID")
                         val request = call.receive<com.apptime.code.rewards.CreateRewardCatalogRequest>()
                         val catalogItem = rewardService.updateRewardCatalogItem(id, request)
-                        call.respondApi(catalogItem, "Catalog item updated successfully")
+                        call.respondApi(catalogItem, messageKey = MessageKeys.CATALOG_ITEM_UPDATED)
                     } catch (e: IllegalArgumentException) {
-                        call.respondError(HttpStatusCode.BadRequest, e.message ?: "Invalid request")
+                        call.respondError(HttpStatusCode.BadRequest, messageKey = MessageKeys.INVALID_REQUEST, message = e.message)
                     } catch (e: Exception) {
-                        call.respondError(HttpStatusCode.InternalServerError, "Failed to update catalog item: ${e.message}")
+                        call.respondError(HttpStatusCode.InternalServerError, messageKey = MessageKeys.CATALOG_FAILED, message = "Failed to update catalog item: ${e.message}")
                     }
                 }
             }
@@ -464,9 +506,9 @@ fun Application.configureAdminRoutes() {
                         val offset = call.request.queryParameters["offset"]?.toIntOrNull() ?: 0
                         
                         val transactions = rewardService.getAllTransactions(status, limit, offset)
-                        call.respondApi(transactions, "Transactions retrieved successfully")
+                        call.respondApi(transactions, messageKey = MessageKeys.TRANSACTIONS_RETRIEVED)
                     } catch (e: Exception) {
-                        call.respondError(HttpStatusCode.InternalServerError, "Failed to retrieve transactions: ${e.message}")
+                        call.respondError(HttpStatusCode.InternalServerError, messageKey = MessageKeys.TRANSACTIONS_FAILED, message = "Failed to retrieve transactions: ${e.message}")
                     }
                 }
                 
@@ -477,11 +519,11 @@ fun Application.configureAdminRoutes() {
                             ?: throw IllegalArgumentException("Invalid transaction ID")
                         val transaction = rewardService.getTransactionById(id)
                             ?: throw IllegalArgumentException("Transaction not found")
-                        call.respondApi(transaction, "Transaction retrieved successfully")
+                        call.respondApi(transaction, messageKey = MessageKeys.TRANSACTION_RETRIEVED)
                     } catch (e: IllegalArgumentException) {
-                        call.respondError(HttpStatusCode.BadRequest, e.message ?: "Invalid request")
+                        call.respondError(HttpStatusCode.BadRequest, messageKey = MessageKeys.INVALID_REQUEST, message = e.message)
                     } catch (e: Exception) {
-                        call.respondError(HttpStatusCode.InternalServerError, "Failed to retrieve transaction: ${e.message}")
+                        call.respondError(HttpStatusCode.InternalServerError, messageKey = MessageKeys.TRANSACTIONS_FAILED, message = "Failed to retrieve transaction: ${e.message}")
                     }
                 }
                 
@@ -492,11 +534,11 @@ fun Application.configureAdminRoutes() {
                             ?: throw IllegalArgumentException("Invalid transaction ID")
                         val request = call.receive<com.apptime.code.rewards.UpdateTransactionStatusRequest>()
                         val transaction = rewardService.updateTransactionStatus(id, request)
-                        call.respondApi(transaction, "Transaction status updated successfully")
+                        call.respondApi(transaction, messageKey = MessageKeys.TRANSACTION_STATUS_UPDATED)
                     } catch (e: IllegalArgumentException) {
-                        call.respondError(HttpStatusCode.BadRequest, e.message ?: "Invalid request")
+                        call.respondError(HttpStatusCode.BadRequest, messageKey = MessageKeys.INVALID_REQUEST, message = e.message)
                     } catch (e: Exception) {
-                        call.respondError(HttpStatusCode.InternalServerError, "Failed to update transaction status: ${e.message}")
+                        call.respondError(HttpStatusCode.InternalServerError, messageKey = MessageKeys.TRANSACTIONS_FAILED, message = "Failed to update transaction status: ${e.message}")
                     }
                 }
             }

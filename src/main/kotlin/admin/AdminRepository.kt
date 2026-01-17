@@ -7,6 +7,7 @@ import com.apptime.code.common.dbTransaction
 import com.apptime.code.consents.ConsentTemplates
 import com.apptime.code.consents.UserConsents
 import com.apptime.code.rewards.Rewards
+import com.apptime.code.rewards.Coins
 import com.apptime.code.users.Users
 import kotlinx.datetime.Instant
 import kotlinx.serialization.json.Json
@@ -181,8 +182,16 @@ class AdminRepository {
                 .orderBy(Users.createdAt to SortOrder.DESC)
                 .limit(limit, offset.toLong())
                 .map { row ->
+                    val userId = row[Users.userId]
+                    // Calculate total coins for this user
+                    val now = kotlinx.datetime.Clock.System.now()
+                    val totalCoins = Coins.select { 
+                        (Coins.userId eq userId) and
+                        ((Coins.expiresAt.isNull()) or (Coins.expiresAt greater now))
+                    }.sumOf { it[Coins.amount] } ?: 0L
+                    
                     AdminUserResponse(
-                        userId = row[Users.userId],
+                        userId = userId,
                         username = row[Users.username],
                         email = row[Users.email],
                         name = row[Users.name],
@@ -193,7 +202,8 @@ class AdminRepository {
                         totpEnabled = row[Users.totpEnabled],
                         isBlocked = row[Users.isBlocked],
                         createdAt = row[Users.createdAt].toString(),
-                        lastSyncTime = row[Users.lastSyncTime]?.toString()
+                        lastSyncTime = row[Users.lastSyncTime]?.toString(),
+                        totalCoins = totalCoins
                     )
                 }
         }
@@ -204,6 +214,13 @@ class AdminRepository {
             Users.select { Users.userId eq userId }
                 .firstOrNull()
                 ?.let { row ->
+                    // Calculate total coins for this user
+                    val now = kotlinx.datetime.Clock.System.now()
+                    val totalCoins = Coins.select { 
+                        (Coins.userId eq userId) and
+                        ((Coins.expiresAt.isNull()) or (Coins.expiresAt greater now))
+                    }.sumOf { it[Coins.amount] } ?: 0L
+                    
                     AdminUserResponse(
                         userId = row[Users.userId],
                         username = row[Users.username],
@@ -216,7 +233,8 @@ class AdminRepository {
                         totpEnabled = row[Users.totpEnabled],
                         isBlocked = row[Users.isBlocked],
                         createdAt = row[Users.createdAt].toString(),
-                        lastSyncTime = row[Users.lastSyncTime]?.toString()
+                        lastSyncTime = row[Users.lastSyncTime]?.toString(),
+                        totalCoins = totalCoins
                     )
                 }
         }

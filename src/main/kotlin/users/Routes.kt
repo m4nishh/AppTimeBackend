@@ -1,5 +1,6 @@
 package users
 
+import com.apptime.code.common.MessageKeys
 import com.apptime.code.common.requireUserId
 import com.apptime.code.common.respondApi
 import com.apptime.code.common.respondError
@@ -29,11 +30,11 @@ fun Application.configureUserRoutes() {
                 try {
                     val request = call.receive<DeviceRegistrationRequest>()
                     val response = service.registerDevice(request)
-                    call.respondApi(response, "Device registered successfully", HttpStatusCode.Created)
+                    call.respondApi(response, statusCode = HttpStatusCode.Created, messageKey = MessageKeys.DEVICE_REGISTERED)
                 } catch (e: IllegalArgumentException) {
-                    call.respondError(HttpStatusCode.BadRequest, e.message ?: "Invalid request")
+                    call.respondError(HttpStatusCode.BadRequest, messageKey = MessageKeys.INVALID_REQUEST, message = e.message)
                 } catch (e: Exception) {
-                    call.respondError(HttpStatusCode.InternalServerError, "Registration failed: ${e.message}")
+                    call.respondError(HttpStatusCode.InternalServerError, messageKey = MessageKeys.REGISTRATION_FAILED, message = "Registration failed: ${e.message}")
                 }
             }
             
@@ -51,11 +52,11 @@ fun Application.configureUserRoutes() {
                         ?: throw IllegalArgumentException("Search query parameter 'q' is required")
                     
                     val results = service.searchUsers(query)
-                    call.respondApi(results, "Users found: ${results.size}")
+                    call.respondApi(results, messageKey = MessageKeys.USERS_FOUND, message = "Users found: ${results.size}")
                 } catch (e: IllegalArgumentException) {
-                    call.respondError(HttpStatusCode.BadRequest, e.message ?: "Invalid request")
+                    call.respondError(HttpStatusCode.BadRequest, messageKey = MessageKeys.INVALID_REQUEST, message = e.message)
                 } catch (e: Exception) {
-                    call.respondError(HttpStatusCode.InternalServerError, "Search failed: ${e.message}")
+                    call.respondError(HttpStatusCode.InternalServerError, messageKey = MessageKeys.SEARCH_FAILED, message = "Search failed: ${e.message}")
                     }
                 }
             }
@@ -72,11 +73,11 @@ fun Application.configureUserRoutes() {
                         ?: throw IllegalArgumentException("Username is required")
                     
                     val response = service.generateTOTPCodeByUsername(username)
-                    call.respondApi(response, "TOTP code generated successfully")
+                    call.respondApi(response, messageKey = MessageKeys.TOTP_GENERATED)
                 } catch (e: IllegalArgumentException) {
-                    call.respondError(HttpStatusCode.BadRequest, e.message ?: "Invalid request")
+                    call.respondError(HttpStatusCode.BadRequest, messageKey = MessageKeys.INVALID_REQUEST, message = e.message)
                 } catch (e: Exception) {
-                    call.respondError(HttpStatusCode.InternalServerError, "Failed to generate TOTP code: ${e.message}")
+                    call.respondError(HttpStatusCode.InternalServerError, messageKey = MessageKeys.TOTP_GENERATE_FAILED, message = "Failed to generate TOTP code: ${e.message}")
                 }
             }
             
@@ -102,14 +103,14 @@ fun Application.configureUserRoutes() {
                         )
                     
                     if (response.valid) {
-                        call.respondApi(response, "TOTP code verified successfully")
+                        call.respondApi(response, messageKey = MessageKeys.TOTP_VERIFIED)
                     } else {
-                        call.respondError(HttpStatusCode.BadRequest, response.message)
+                        call.respondError(HttpStatusCode.BadRequest, message = response.message)
                     }
                 } catch (e: IllegalArgumentException) {
-                    call.respondError(HttpStatusCode.BadRequest, e.message ?: "Invalid request")
+                    call.respondError(HttpStatusCode.BadRequest, messageKey = MessageKeys.INVALID_REQUEST, message = e.message)
                 } catch (e: Exception) {
-                    call.respondError(HttpStatusCode.InternalServerError, "Failed to verify TOTP code: ${e.message}")
+                    call.respondError(HttpStatusCode.InternalServerError, messageKey = MessageKeys.TOTP_VERIFY_FAILED, message = "Failed to verify TOTP code: ${e.message}")
                     }
                 }
             }
@@ -130,14 +131,14 @@ fun Application.configureUserRoutes() {
                     val response = service.checkTOTPAccessStatus(username, requestingUserId)
                     
                     if (response.hasAccess) {
-                        call.respondApi(response, "Access status retrieved successfully")
+                        call.respondApi(response, messageKey = MessageKeys.TOTP_ACCESS_STATUS_RETRIEVED)
                     } else {
-                        call.respondApi(response, response.message, HttpStatusCode.Forbidden)
+                        call.respondApi(response, statusCode = HttpStatusCode.Forbidden, message = response.message)
                     }
                 } catch (e: IllegalArgumentException) {
-                    call.respondError(HttpStatusCode.BadRequest, e.message ?: "Invalid request")
+                    call.respondError(HttpStatusCode.BadRequest, messageKey = MessageKeys.INVALID_REQUEST, message = e.message)
                 } catch (e: Exception) {
-                    call.respondError(HttpStatusCode.InternalServerError, "Failed to check access status: ${e.message}")
+                    call.respondError(HttpStatusCode.InternalServerError, messageKey = MessageKeys.TOTP_ACCESS_STATUS_FAILED, message = "Failed to check access status: ${e.message}")
                 }
             }
             }
@@ -165,7 +166,8 @@ fun Application.configureUserRoutes() {
                                     success = false,
                                     message = "No valid access session. Please verify TOTP code first."
                                 ),
-                                statusCode = HttpStatusCode.Forbidden
+                                statusCode = HttpStatusCode.Forbidden,
+                                messageKey = MessageKeys.TOTP_NO_SESSION
                             )
                             return@post
                         }
@@ -217,15 +219,15 @@ fun Application.configureUserRoutes() {
                         val profile = service.getUserProfile(userId)
 
                         if (profile != null) {
-                            call.respondApi(profile, "Profile retrieved successfully")
+                            call.respondApi(profile, messageKey = MessageKeys.PROFILE_RETRIEVED)
                         } else {
-                            call.respondError(HttpStatusCode.NotFound, "User not found")
+                            call.respondError(HttpStatusCode.NotFound, messageKey = MessageKeys.USER_NOT_FOUND)
                         }
                     } catch (e: IllegalArgumentException) {
-                        call.respondError(HttpStatusCode.BadRequest, e.message ?: "Invalid request")
+                        call.respondError(HttpStatusCode.BadRequest, messageKey = MessageKeys.INVALID_REQUEST, message = e.message)
                     } catch (e: Exception) {
                         call.respondError(
-                            HttpStatusCode.InternalServerError, "Failed to retrieve profile: ${e.message}"
+                            HttpStatusCode.InternalServerError, messageKey = MessageKeys.PROFILE_RETRIEVED, message = "Failed to retrieve profile: ${e.message}"
                         )
                     }
                 }
@@ -276,14 +278,14 @@ fun Application.configureUserRoutes() {
                         val updatedProfile = service.updateUserProfile(userId, request.username, request.firebaseToken)
 
                         if (updatedProfile != null) {
-                            call.respondApi(updatedProfile, "Profile updated successfully")
+                            call.respondApi(updatedProfile, messageKey = MessageKeys.PROFILE_UPDATED)
                         } else {
-                            call.respondError(HttpStatusCode.NotFound, "User not found")
+                            call.respondError(HttpStatusCode.NotFound, messageKey = MessageKeys.USER_NOT_FOUND)
                         }
                     } catch (e: IllegalArgumentException) {
-                        call.respondError(HttpStatusCode.BadRequest, e.message ?: "Invalid request")
+                        call.respondError(HttpStatusCode.BadRequest, messageKey = MessageKeys.INVALID_REQUEST, message = e.message)
                     } catch (e: Exception) {
-                        call.respondError(HttpStatusCode.InternalServerError, "Failed to update profile: ${e.message}")
+                        call.respondError(HttpStatusCode.InternalServerError, messageKey = MessageKeys.PROFILE_UPDATE_FAILED, message = "Failed to update profile: ${e.message}")
                     }
                 }
                 
@@ -330,14 +332,14 @@ fun Application.configureUserRoutes() {
                         val updatedProfile = service.updateUserProfile(userId, request.username)
 
                         if (updatedProfile != null) {
-                            call.respondApi(updatedProfile, "Username updated successfully")
+                            call.respondApi(updatedProfile, messageKey = MessageKeys.USERNAME_UPDATED)
                         } else {
-                            call.respondError(HttpStatusCode.NotFound, "User not found")
+                            call.respondError(HttpStatusCode.NotFound, messageKey = MessageKeys.USER_NOT_FOUND)
                         }
                     } catch (e: IllegalArgumentException) {
-                        call.respondError(HttpStatusCode.BadRequest, e.message ?: "Invalid request")
+                        call.respondError(HttpStatusCode.BadRequest, messageKey = MessageKeys.INVALID_REQUEST, message = e.message)
                     } catch (e: Exception) {
-                        call.respondError(HttpStatusCode.InternalServerError, "Failed to update username: ${e.message}")
+                        call.respondError(HttpStatusCode.InternalServerError, messageKey = MessageKeys.USERNAME_UPDATE_FAILED, message = "Failed to update username: ${e.message}")
                     }
                 }
                 
@@ -350,11 +352,11 @@ fun Application.configureUserRoutes() {
                     try {
                         val userId = call.requireUserId()
                         val response = service.generateTOTPCodeByUserId(userId)
-                        call.respondApi(response, "TOTP code generated successfully")
+                        call.respondApi(response, messageKey = MessageKeys.TOTP_GENERATED)
                     } catch (e: IllegalArgumentException) {
-                        call.respondError(HttpStatusCode.BadRequest, e.message ?: "Invalid request")
+                        call.respondError(HttpStatusCode.BadRequest, messageKey = MessageKeys.INVALID_REQUEST, message = e.message)
                     } catch (e: Exception) {
-                        call.respondError(HttpStatusCode.InternalServerError, "Failed to generate TOTP code: ${e.message}")
+                        call.respondError(HttpStatusCode.InternalServerError, messageKey = MessageKeys.TOTP_GENERATE_FAILED, message = "Failed to generate TOTP code: ${e.message}")
                     }
                 }
                 
@@ -367,9 +369,9 @@ fun Application.configureUserRoutes() {
                     try {
                         val requestingUserId = call.requireUserId()
                         val sessions = repository.getActiveSessionsForUser(requestingUserId)
-                        call.respondApi(sessions, "Active TOTP verification sessions retrieved successfully")
+                        call.respondApi(sessions, messageKey = MessageKeys.TOTP_SESSIONS_RETRIEVED)
                     } catch (e: Exception) {
-                        call.respondError(HttpStatusCode.InternalServerError, "Failed to get sessions: ${e.message}")
+                        call.respondError(HttpStatusCode.InternalServerError, messageKey = MessageKeys.TOTP_SESSIONS_FAILED, message = "Failed to get sessions: ${e.message}")
                     }
                 }
                 
@@ -402,9 +404,9 @@ fun Application.configureUserRoutes() {
                             "hasSyncedBefore" to (lastSyncTime != null)
                         )
                         
-                        call.respondApi(syncStatus, "Sync status retrieved successfully")
+                        call.respondApi(syncStatus, messageKey = MessageKeys.SYNC_STATUS_RETRIEVED)
                     } catch (e: Exception) {
-                        call.respondError(HttpStatusCode.InternalServerError, "Failed to get sync status: ${e.message}")
+                        call.respondError(HttpStatusCode.InternalServerError, messageKey = MessageKeys.SYNC_STATUS_FAILED, message = "Failed to get sync status: ${e.message}")
                     }
                 }
                 
@@ -417,11 +419,11 @@ fun Application.configureUserRoutes() {
                     try {
                         val userId = call.requireUserId()
                         val response = service.getControlPanelOverview(userId)
-                        call.respondApi(response, "Control panel data retrieved successfully")
+                        call.respondApi(response, messageKey = MessageKeys.TOTP_CONTROL_PANEL_RETRIEVED)
                     } catch (e: IllegalArgumentException) {
-                        call.respondError(HttpStatusCode.BadRequest, e.message ?: "Invalid request")
+                        call.respondError(HttpStatusCode.BadRequest, messageKey = MessageKeys.INVALID_REQUEST, message = e.message)
                     } catch (e: Exception) {
-                        call.respondError(HttpStatusCode.InternalServerError, "Failed to get control panel data: ${e.message}")
+                        call.respondError(HttpStatusCode.InternalServerError, messageKey = MessageKeys.TOTP_CONTROL_PANEL_FAILED, message = "Failed to get control panel data: ${e.message}")
                     }
                 }
                 
@@ -484,14 +486,14 @@ fun Application.configureUserRoutes() {
                                 }
                             }
                             
-                            call.respondApi(response, "Access granted successfully")
+                            call.respondApi(response, messageKey = MessageKeys.TOTP_ACCESS_GRANTED)
                         } else {
-                            call.respondError(HttpStatusCode.BadRequest, response.message)
+                            call.respondError(HttpStatusCode.BadRequest, message = response.message)
                         }
                     } catch (e: IllegalArgumentException) {
-                        call.respondError(HttpStatusCode.BadRequest, e.message ?: "Invalid request")
+                        call.respondError(HttpStatusCode.BadRequest, messageKey = MessageKeys.INVALID_REQUEST, message = e.message)
                     } catch (e: Exception) {
-                        call.respondError(HttpStatusCode.InternalServerError, "Failed to grant access: ${e.message}")
+                        call.respondError(HttpStatusCode.InternalServerError, messageKey = MessageKeys.TOTP_ACCESS_GRANT_FAILED, message = "Failed to grant access: ${e.message}")
                     }
                 }
                 
@@ -543,15 +545,15 @@ fun Application.configureUserRoutes() {
                             
                             call.respondApi(
                                 SimpleResponse(success = true, message = "Access revoked successfully"),
-                                "Access revoked successfully"
+                                messageKey = MessageKeys.TOTP_ACCESS_REVOKED
                             )
                         } else {
-                            call.respondError(HttpStatusCode.NotFound, "No active session found to revoke")
+                            call.respondError(HttpStatusCode.NotFound, messageKey = MessageKeys.NOT_FOUND, message = "No active session found to revoke")
                         }
                     } catch (e: IllegalArgumentException) {
-                        call.respondError(HttpStatusCode.BadRequest, e.message ?: "Invalid request")
+                        call.respondError(HttpStatusCode.BadRequest, messageKey = MessageKeys.INVALID_REQUEST, message = e.message)
                     } catch (e: Exception) {
-                        call.respondError(HttpStatusCode.InternalServerError, "Failed to revoke access: ${e.message}")
+                        call.respondError(HttpStatusCode.InternalServerError, messageKey = MessageKeys.TOTP_ACCESS_REVOKE_FAILED, message = "Failed to revoke access: ${e.message}")
                     }
                 }
                 
@@ -624,14 +626,14 @@ fun Application.configureUserRoutes() {
                                 }
                             }
                             
-                            call.respondApi(response, "Access time extended successfully")
+                            call.respondApi(response, messageKey = MessageKeys.TOTP_ACCESS_EXTENDED)
                         } else {
-                            call.respondError(HttpStatusCode.NotFound, response.message)
+                            call.respondError(HttpStatusCode.NotFound, message = response.message)
                         }
                     } catch (e: IllegalArgumentException) {
-                        call.respondError(HttpStatusCode.BadRequest, e.message ?: "Invalid request")
+                        call.respondError(HttpStatusCode.BadRequest, messageKey = MessageKeys.INVALID_REQUEST, message = e.message)
                     } catch (e: Exception) {
-                        call.respondError(HttpStatusCode.InternalServerError, "Failed to extend access time: ${e.message}")
+                        call.respondError(HttpStatusCode.InternalServerError, messageKey = MessageKeys.TOTP_ACCESS_EXTEND_FAILED, message = "Failed to extend access time: ${e.message}")
                     }
                 }
             }

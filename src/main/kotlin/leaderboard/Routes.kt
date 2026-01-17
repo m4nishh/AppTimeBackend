@@ -1,5 +1,6 @@
 package com.apptime.code.leaderboard
 
+import com.apptime.code.common.MessageKeys
 import com.apptime.code.common.respondApi
 import com.apptime.code.common.respondError
 import com.apptime.code.common.requireUserId
@@ -33,13 +34,14 @@ fun Application.configureLeaderboardRoutes() {
                     // Priority: query param userId > authenticated userId > null
                     val currentUserId = call.request.queryParameters["userId"] ?: call.userId
                     val leaderboard = service.getDailyLeaderboard(date, currentUserId)
-                    call.respondApi(leaderboard, "Daily leaderboard retrieved successfully")
+                    call.respondApi(leaderboard, messageKey = MessageKeys.DAILY_LEADERBOARD_RETRIEVED)
                 } catch (e: IllegalArgumentException) {
-                    call.respondError(HttpStatusCode.BadRequest, e.message ?: "Invalid request")
+                    call.respondError(HttpStatusCode.BadRequest, messageKey = MessageKeys.INVALID_REQUEST, message = e.message)
                 } catch (e: Exception) {
                     call.respondError(
                         HttpStatusCode.InternalServerError,
-                        "Failed to retrieve daily leaderboard: ${e.message}"
+                        messageKey = MessageKeys.DAILY_LEADERBOARD_FAILED,
+                        message = "Failed to retrieve daily leaderboard: ${e.message}"
                     )
                 }
             }
@@ -58,13 +60,14 @@ fun Application.configureLeaderboardRoutes() {
                     // Priority: query param userId > authenticated userId > null
                     val currentUserId = call.request.queryParameters["userId"] ?: call.userId
                     val leaderboard = service.getWeeklyLeaderboard(weekDate, currentUserId)
-                    call.respondApi(leaderboard, "Weekly leaderboard retrieved successfully")
+                    call.respondApi(leaderboard, messageKey = MessageKeys.WEEKLY_LEADERBOARD_RETRIEVED)
                 } catch (e: IllegalArgumentException) {
-                    call.respondError(HttpStatusCode.BadRequest, e.message ?: "Invalid request")
+                    call.respondError(HttpStatusCode.BadRequest, messageKey = MessageKeys.INVALID_REQUEST, message = e.message)
                 } catch (e: Exception) {
                     call.respondError(
                         HttpStatusCode.InternalServerError,
-                        "Failed to retrieve weekly leaderboard: ${e.message}"
+                        messageKey = MessageKeys.WEEKLY_LEADERBOARD_FAILED,
+                        message = "Failed to retrieve weekly leaderboard: ${e.message}"
                     )
                 }
             }
@@ -84,13 +87,14 @@ fun Application.configureLeaderboardRoutes() {
                     // Priority: query param userId > authenticated userId > null
                     val currentUserId = call.request.queryParameters["userId"] ?: call.userId
                     val leaderboard = service.getMonthlyLeaderboard(monthDate, currentUserId)
-                    call.respondApi(leaderboard, "Monthly leaderboard retrieved successfully")
+                    call.respondApi(leaderboard, messageKey = MessageKeys.MONTHLY_LEADERBOARD_RETRIEVED)
                 } catch (e: IllegalArgumentException) {
-                    call.respondError(HttpStatusCode.BadRequest, e.message ?: "Invalid request")
+                    call.respondError(HttpStatusCode.BadRequest, messageKey = MessageKeys.INVALID_REQUEST, message = e.message)
                 } catch (e: Exception) {
                     call.respondError(
                         HttpStatusCode.InternalServerError,
-                        "Failed to retrieve monthly leaderboard: ${e.message}"
+                        messageKey = MessageKeys.MONTHLY_LEADERBOARD_FAILED,
+                        message = "Failed to retrieve monthly leaderboard: ${e.message}"
                     )
                 }
             }
@@ -105,13 +109,14 @@ fun Application.configureLeaderboardRoutes() {
                 try {
                     val date = call.request.queryParameters["date"]
                     val result = service.syncFromAppUsageEvents(date)
-                    call.respondApi(result, "Leaderboard stats synced successfully")
+                    call.respondApi(result, messageKey = MessageKeys.LEADERBOARD_SYNCED)
                 } catch (e: IllegalArgumentException) {
-                    call.respondError(HttpStatusCode.BadRequest, e.message ?: "Invalid request")
+                    call.respondError(HttpStatusCode.BadRequest, messageKey = MessageKeys.INVALID_REQUEST, message = e.message)
                 } catch (e: Exception) {
                     call.respondError(
                         HttpStatusCode.InternalServerError,
-                        "Failed to sync leaderboard stats: ${e.message}"
+                        messageKey = MessageKeys.LEADERBOARD_SYNC_FAILED,
+                        message = "Failed to sync leaderboard stats: ${e.message}"
                     )
                 }
             }
@@ -140,13 +145,14 @@ fun Application.configureLeaderboardRoutes() {
                             replace = request.replace
                         )
 
-                        call.respondApi(response, response.message)
+                        call.respondApi(response, message = response.message)
                     } catch (e: IllegalArgumentException) {
-                        call.respondError(HttpStatusCode.BadRequest, e.message ?: "Invalid request")
+                        call.respondError(HttpStatusCode.BadRequest, messageKey = MessageKeys.INVALID_REQUEST, message = e.message)
                     } catch (e: Exception) {
                         call.respondError(
                             HttpStatusCode.InternalServerError,
-                            "Failed to update leaderboard stats: ${e.message}"
+                            messageKey = MessageKeys.LEADERBOARD_STATS_UPDATE_FAILED,
+                            message = "Failed to update leaderboard stats: ${e.message}"
                         )
                     }
                 }
@@ -172,13 +178,14 @@ fun Application.configureLeaderboardRoutes() {
                         val request = call.receive<GetScreenTimeByUsernamesRequest>()
 
                         val response = service.getScreenTimeByUsernames(request.users, authenticatedUserId)
-                        call.respondApi(response, "Screen time retrieved successfully")
+                        call.respondApi(response, messageKey = MessageKeys.SCREEN_TIME_RETRIEVED)
                     } catch (e: IllegalArgumentException) {
-                        call.respondError(HttpStatusCode.BadRequest, e.message ?: "Invalid request")
+                        call.respondError(HttpStatusCode.BadRequest, messageKey = MessageKeys.INVALID_REQUEST, message = e.message)
                     } catch (e: Exception) {
                         call.respondError(
                             HttpStatusCode.InternalServerError,
-                            "Failed to retrieve screen time: ${e.message}"
+                            messageKey = MessageKeys.SCREEN_TIME_FAILED,
+                            message = "Failed to retrieve screen time: ${e.message}"
                         )
                     }
                 }

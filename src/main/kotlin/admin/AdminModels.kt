@@ -84,7 +84,14 @@ data class AdminUserResponse(
     val totpEnabled: Boolean,
     val isBlocked: Boolean,
     val createdAt: String,
-    val lastSyncTime: String? = null
+    val lastSyncTime: String? = null,
+    val totalCoins: Long = 0
+)
+
+@Serializable
+data class AddCoinsToUserRequest(
+    val amount: Long,
+    val description: String? = null
 )
 
 @Serializable

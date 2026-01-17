@@ -1,5 +1,6 @@
 package com.apptime.code.focus
 
+import com.apptime.code.common.MessageKeys
 import com.apptime.code.common.respondApi
 import com.apptime.code.common.respondError
 import com.apptime.code.common.requireUserId
@@ -51,18 +52,18 @@ fun Application.configureFocusRoutes() {
                             service.submitFocusSessions(userId, listOf(singleRequest))
                         }
                         
-                        val message = if (result.totalSubmitted == 1) {
-                            "Focus session submitted successfully"
+                        val messageKey = if (result.totalSubmitted == 1) {
+                            MessageKeys.FOCUS_SESSION_SUBMITTED
                         } else {
-                            "Focus sessions submitted successfully"
+                            MessageKeys.FOCUS_SESSIONS_SUBMITTED
                         }
-                        call.respondApi(result, message, HttpStatusCode.Created)
+                        call.respondApi(result, statusCode = HttpStatusCode.Created, messageKey = messageKey)
                     } catch (e: IllegalArgumentException) {
-                        call.respondError(HttpStatusCode.BadRequest, e.message ?: "Invalid request")
+                        call.respondError(HttpStatusCode.BadRequest, messageKey = MessageKeys.INVALID_REQUEST, message = e.message)
                     } catch (e: kotlinx.serialization.SerializationException) {
-                        call.respondError(HttpStatusCode.BadRequest, "Invalid JSON format: ${e.message}")
+                        call.respondError(HttpStatusCode.BadRequest, messageKey = MessageKeys.INVALID_JSON, message = "Invalid JSON format: ${e.message}")
                     } catch (e: Exception) {
-                        call.respondError(HttpStatusCode.InternalServerError, "Failed to submit focus session: ${e.message}")
+                        call.respondError(HttpStatusCode.InternalServerError, messageKey = MessageKeys.FOCUS_SUBMIT_FAILED, message = "Failed to submit focus session: ${e.message}")
                     }
                 }
                 
@@ -81,16 +82,16 @@ fun Application.configureFocusRoutes() {
                         val endDate = call.request.queryParameters["endDate"]
                         
                         val history = service.getFocusHistory(userId, startDate, endDate)
-                        val message = if (startDate != null || endDate != null) {
-                            "Focus history retrieved successfully for the specified time range"
+                        val messageKey = if (startDate != null || endDate != null) {
+                            MessageKeys.FOCUS_HISTORY_RANGE_RETRIEVED
                         } else {
-                            "All focus sessions retrieved successfully"
+                            MessageKeys.FOCUS_HISTORY_RETRIEVED
                         }
-                        call.respondApi(history, message)
+                        call.respondApi(history, messageKey = messageKey)
                     } catch (e: IllegalArgumentException) {
-                        call.respondError(HttpStatusCode.BadRequest, e.message ?: "Invalid request")
+                        call.respondError(HttpStatusCode.BadRequest, messageKey = MessageKeys.INVALID_REQUEST, message = e.message)
                     } catch (e: Exception) {
-                        call.respondError(HttpStatusCode.InternalServerError, "Failed to retrieve focus history: ${e.message}")
+                        call.respondError(HttpStatusCode.InternalServerError, messageKey = MessageKeys.FOCUS_HISTORY_FAILED, message = "Failed to retrieve focus history: ${e.message}")
                     }
                 }
                 
@@ -102,9 +103,9 @@ fun Application.configureFocusRoutes() {
                     try {
                         val userId = call.requireUserId()
                         val stats = service.getFocusStats(userId)
-                        call.respondApi(stats, "Focus stats retrieved successfully")
+                        call.respondApi(stats, messageKey = MessageKeys.FOCUS_STATS_RETRIEVED)
                     } catch (e: Exception) {
-                        call.respondError(HttpStatusCode.InternalServerError, "Failed to retrieve focus stats: ${e.message}")
+                        call.respondError(HttpStatusCode.InternalServerError, messageKey = MessageKeys.FOCUS_STATS_FAILED, message = "Failed to retrieve focus stats: ${e.message}")
                     }
                 }
             }
@@ -129,11 +130,11 @@ fun Application.configureFocusRoutes() {
                                 endTime = request.endTime
                             )
                             
-                            call.respondApi(response, "Focus mode stats saved successfully", HttpStatusCode.Created)
+                            call.respondApi(response, statusCode = HttpStatusCode.Created, messageKey = MessageKeys.FOCUS_MODE_STATS_SAVED)
                         } catch (e: IllegalArgumentException) {
-                            call.respondError(HttpStatusCode.BadRequest, e.message ?: "Invalid request")
+                            call.respondError(HttpStatusCode.BadRequest, messageKey = MessageKeys.INVALID_REQUEST, message = e.message)
                         } catch (e: Exception) {
-                            call.respondError(HttpStatusCode.InternalServerError, "Failed to save focus mode stats: ${e.message}")
+                            call.respondError(HttpStatusCode.InternalServerError, messageKey = MessageKeys.FOCUS_MODE_STATS_SAVE_FAILED, message = "Failed to save focus mode stats: ${e.message}")
                         }
                     }
                     
@@ -157,22 +158,18 @@ fun Application.configureFocusRoutes() {
                                 endTimeMs = endTimeMs
                             )
                             
-                            val message = when {
-                                startTimeMs != null && endTimeMs != null -> 
-                                    "Focus mode stats retrieved successfully for time range"
-                                startTimeMs != null -> 
-                                    "Focus mode stats retrieved successfully from start time"
-                                endTimeMs != null -> 
-                                    "Focus mode stats retrieved successfully until end time"
-                                else -> 
-                                    "All focus mode stats retrieved successfully"
+                            val messageKey = when {
+                                startTimeMs != null && endTimeMs != null -> MessageKeys.FOCUS_MODE_STATS_RANGE_RETRIEVED
+                                startTimeMs != null -> MessageKeys.FOCUS_MODE_STATS_FROM_RETRIEVED
+                                endTimeMs != null -> MessageKeys.FOCUS_MODE_STATS_UNTIL_RETRIEVED
+                                else -> MessageKeys.FOCUS_MODE_STATS_RETRIEVED
                             }
                             
-                            call.respondApi(response, message)
+                            call.respondApi(response, messageKey = messageKey)
                         } catch (e: IllegalArgumentException) {
-                            call.respondError(HttpStatusCode.BadRequest, e.message ?: "Invalid request")
+                            call.respondError(HttpStatusCode.BadRequest, messageKey = MessageKeys.INVALID_REQUEST, message = e.message)
                         } catch (e: Exception) {
-                            call.respondError(HttpStatusCode.InternalServerError, "Failed to retrieve focus mode stats: ${e.message}")
+                            call.respondError(HttpStatusCode.InternalServerError, messageKey = MessageKeys.FOCUS_MODE_STATS_FAILED, message = "Failed to retrieve focus mode stats: ${e.message}")
                         }
                     }
                 }

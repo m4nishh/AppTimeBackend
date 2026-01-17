@@ -1,5 +1,6 @@
 package com.apptime.code.location
 
+import com.apptime.code.common.MessageKeys
 import com.apptime.code.common.respondApi
 import com.apptime.code.common.respondError
 import com.apptime.code.common.requireUserId
@@ -34,11 +35,11 @@ fun Application.configureLocationRoutes() {
                         val request = call.receive<LocationSyncRequest>()
 
                         val response = service.syncLocation(userId, request)
-                        call.respondApi(response, response.message, HttpStatusCode.OK)
+                        call.respondApi(response, message = response.message)
                     } catch (e: IllegalArgumentException) {
-                        call.respondError(HttpStatusCode.BadRequest, e.message ?: "Invalid request")
+                        call.respondError(HttpStatusCode.BadRequest, messageKey = MessageKeys.INVALID_REQUEST, message = e.message)
                     } catch (e: Exception) {
-                        call.respondError(HttpStatusCode.InternalServerError, "Failed to sync location: ${e.message}")
+                        call.respondError(HttpStatusCode.InternalServerError, messageKey = MessageKeys.LOCATION_SYNC_FAILED, message = "Failed to sync location: ${e.message}")
                     }
                 }
             }
@@ -57,13 +58,13 @@ fun Application.configureLocationRoutes() {
                             ?: throw IllegalArgumentException("Username is required")
 
                         val response = service.getLocationByUsername(username, requestingUserId)
-                        call.respondApi(response, "Last location retrieved successfully")
+                        call.respondApi(response, messageKey = MessageKeys.LOCATION_RETRIEVED)
                     } catch (e: IllegalArgumentException) {
-                        call.respondError(HttpStatusCode.BadRequest, e.message ?: "Invalid request")
+                        call.respondError(HttpStatusCode.BadRequest, messageKey = MessageKeys.INVALID_REQUEST, message = e.message)
                     } catch (e: SecurityException) {
-                        call.respondError(HttpStatusCode.Forbidden, e.message ?: "Access denied")
+                        call.respondError(HttpStatusCode.Forbidden, messageKey = MessageKeys.ACCESS_DENIED, message = e.message)
                     } catch (e: Exception) {
-                        call.respondError(HttpStatusCode.InternalServerError, "Failed to get location: ${e.message}")
+                        call.respondError(HttpStatusCode.InternalServerError, messageKey = MessageKeys.LOCATION_FAILED, message = "Failed to get location: ${e.message}")
                     }
                 }
             }

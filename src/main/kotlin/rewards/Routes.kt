@@ -1,6 +1,7 @@
 package com.apptime.code.rewards
 
 import com.apptime.code.challenges.ChallengeRepository
+import com.apptime.code.common.MessageKeys
 import com.apptime.code.common.respondApi
 import com.apptime.code.common.respondError
 import com.apptime.code.common.requireUserId
@@ -60,9 +61,9 @@ fun Application.configureRewardRoutes() {
                             limit = limit,
                             offset = offset
                         )
-                        call.respondApi(response, "User rewards retrieved successfully")
+                        call.respondApi(response, messageKey = MessageKeys.USER_REWARDS_RETRIEVED)
                     } catch (e: Exception) {
-                        call.respondError(HttpStatusCode.InternalServerError, "Failed to retrieve rewards: ${e.message}")
+                        call.respondError(HttpStatusCode.InternalServerError, messageKey = MessageKeys.USER_REWARDS_FAILED, message = "Failed to retrieve rewards: ${e.message}")
                     }
                 }
                 
@@ -75,9 +76,9 @@ fun Application.configureRewardRoutes() {
                     try {
                         val userId = call.requireUserId()
                         val response = service.getRewardSummary(userId)
-                        call.respondApi(response, "Reward summary retrieved successfully")
+                        call.respondApi(response, messageKey = MessageKeys.REWARD_SUMMARY_RETRIEVED)
                     } catch (e: Exception) {
-                        call.respondError(HttpStatusCode.InternalServerError, "Failed to retrieve reward summary: ${e.message}")
+                        call.respondError(HttpStatusCode.InternalServerError, messageKey = MessageKeys.REWARD_SUMMARY_FAILED, message = "Failed to retrieve reward summary: ${e.message}")
                     }
                 }
                 
@@ -92,13 +93,13 @@ fun Application.configureRewardRoutes() {
                         val request = call.receive<ClaimRewardRequest>()
                         
                         val response = service.claimReward(userId, request.rewardId)
-                        call.respondApi(response, response.message)
+                        call.respondApi(response, message = response.message)
                     } catch (e: IllegalArgumentException) {
-                        call.respondError(HttpStatusCode.BadRequest, e.message ?: "Invalid request")
+                        call.respondError(HttpStatusCode.BadRequest, messageKey = MessageKeys.INVALID_REQUEST, message = e.message)
                     } catch (e: IllegalStateException) {
-                        call.respondError(HttpStatusCode.BadRequest, e.message ?: "Invalid request")
+                        call.respondError(HttpStatusCode.BadRequest, messageKey = MessageKeys.INVALID_REQUEST, message = e.message)
                     } catch (e: Exception) {
-                        call.respondError(HttpStatusCode.InternalServerError, "Failed to claim reward: ${e.message}")
+                        call.respondError(HttpStatusCode.InternalServerError, messageKey = MessageKeys.REWARD_CLAIM_FAILED, message = "Failed to claim reward: ${e.message}")
                     }
                 }
                 
@@ -120,11 +121,11 @@ fun Application.configureRewardRoutes() {
                         }
                         
                         val reward = service.createReward(request)
-                        call.respondApi(reward, "Reward created successfully", HttpStatusCode.Created)
+                        call.respondApi(reward, statusCode = HttpStatusCode.Created, messageKey = MessageKeys.REWARD_CREATED)
                     } catch (e: IllegalArgumentException) {
-                        call.respondError(HttpStatusCode.BadRequest, e.message ?: "Invalid request")
+                        call.respondError(HttpStatusCode.BadRequest, messageKey = MessageKeys.INVALID_REQUEST, message = e.message)
                     } catch (e: Exception) {
-                        call.respondError(HttpStatusCode.InternalServerError, "Failed to create reward: ${e.message}")
+                        call.respondError(HttpStatusCode.InternalServerError, messageKey = MessageKeys.REWARD_CREATE_FAILED, message = "Failed to create reward: ${e.message}")
                     }
                 }
                 
@@ -144,13 +145,13 @@ fun Application.configureRewardRoutes() {
                             challengeId = request.challengeId,
                             topNRanks = request.topNRanks
                         )
-                        call.respondApi(response, response.message, HttpStatusCode.Created)
+                        call.respondApi(response, statusCode = HttpStatusCode.Created, message = response.message)
                     } catch (e: IllegalArgumentException) {
-                        call.respondError(HttpStatusCode.BadRequest, e.message ?: "Invalid request")
+                        call.respondError(HttpStatusCode.BadRequest, messageKey = MessageKeys.INVALID_REQUEST, message = e.message)
                     } catch (e: IllegalStateException) {
-                        call.respondError(HttpStatusCode.BadRequest, e.message ?: "Invalid request")
+                        call.respondError(HttpStatusCode.BadRequest, messageKey = MessageKeys.INVALID_REQUEST, message = e.message)
                     } catch (e: Exception) {
-                        call.respondError(HttpStatusCode.InternalServerError, "Failed to award challenge rewards: ${e.message}")
+                        call.respondError(HttpStatusCode.InternalServerError, messageKey = MessageKeys.CHALLENGE_REWARDS_AWARD_FAILED, message = "Failed to award challenge rewards: ${e.message}")
                     }
                 }
                 
@@ -167,12 +168,12 @@ fun Application.configureRewardRoutes() {
                         val rewards = repository.getRewardsByChallenge(challengeId)
                         call.respondApi(
                             mapOf("challengeId" to challengeId, "rewards" to rewards),
-                            "Challenge rewards retrieved successfully"
+                            messageKey = MessageKeys.CHALLENGE_REWARDS_RETRIEVED
                         )
                     } catch (e: IllegalArgumentException) {
-                        call.respondError(HttpStatusCode.BadRequest, e.message ?: "Invalid request")
+                        call.respondError(HttpStatusCode.BadRequest, messageKey = MessageKeys.INVALID_REQUEST, message = e.message)
                     } catch (e: Exception) {
-                        call.respondError(HttpStatusCode.InternalServerError, "Failed to retrieve challenge rewards: ${e.message}")
+                        call.respondError(HttpStatusCode.InternalServerError, messageKey = MessageKeys.CHALLENGE_REWARDS_FAILED, message = "Failed to retrieve challenge rewards: ${e.message}")
                     }
                 }
                 
@@ -203,9 +204,9 @@ fun Application.configureRewardRoutes() {
                             limit = limit,
                             offset = offset
                         )
-                        call.respondApi(response, "User coins retrieved successfully")
+                        call.respondApi(response, messageKey = MessageKeys.USER_COINS_RETRIEVED)
                     } catch (e: Exception) {
-                        call.respondError(HttpStatusCode.InternalServerError, "Failed to retrieve coins: ${e.message}")
+                        call.respondError(HttpStatusCode.InternalServerError, messageKey = MessageKeys.USER_COINS_FAILED, message = "Failed to retrieve coins: ${e.message}")
                     }
                 }
                 
@@ -225,11 +226,11 @@ fun Application.configureRewardRoutes() {
                         }
                         
                         val coin = service.addCoins(request)
-                        call.respondApi(coin, "Coins added successfully", HttpStatusCode.Created)
+                        call.respondApi(coin, statusCode = HttpStatusCode.Created, messageKey = MessageKeys.COINS_ADDED_USER)
                     } catch (e: IllegalArgumentException) {
-                        call.respondError(HttpStatusCode.BadRequest, e.message ?: "Invalid request")
+                        call.respondError(HttpStatusCode.BadRequest, messageKey = MessageKeys.INVALID_REQUEST, message = e.message)
                     } catch (e: Exception) {
-                        call.respondError(HttpStatusCode.InternalServerError, "Failed to add coins: ${e.message}")
+                        call.respondError(HttpStatusCode.InternalServerError, messageKey = MessageKeys.COINS_ADD_FAILED, message = "Failed to add coins: ${e.message}")
                     }
                 }
                 
@@ -245,9 +246,9 @@ fun Application.configureRewardRoutes() {
                     try {
                         val category = call.request.queryParameters["category"]
                         val catalogItems = service.getActiveRewardCatalog(category)
-                        call.respondApi(catalogItems, "Reward catalog retrieved successfully")
+                        call.respondApi(catalogItems, messageKey = MessageKeys.CATALOG_RETRIEVED)
                     } catch (e: Exception) {
-                        call.respondError(HttpStatusCode.InternalServerError, "Failed to retrieve catalog: ${e.message}")
+                        call.respondError(HttpStatusCode.InternalServerError, messageKey = MessageKeys.CATALOG_FAILED, message = "Failed to retrieve catalog: ${e.message}")
                     }
                 }
                 
@@ -263,11 +264,11 @@ fun Application.configureRewardRoutes() {
                         val catalogItem = service.getRewardCatalogById(catalogId)
                             ?: throw IllegalArgumentException("Reward not found")
                         
-                        call.respondApi(catalogItem, "Reward catalog item retrieved successfully")
+                        call.respondApi(catalogItem, messageKey = MessageKeys.CATALOG_ITEM_RETRIEVED)
                     } catch (e: IllegalArgumentException) {
-                        call.respondError(HttpStatusCode.BadRequest, e.message ?: "Invalid request")
+                        call.respondError(HttpStatusCode.BadRequest, messageKey = MessageKeys.INVALID_REQUEST, message = e.message)
                     } catch (e: Exception) {
-                        call.respondError(HttpStatusCode.InternalServerError, "Failed to retrieve catalog item: ${e.message}")
+                        call.respondError(HttpStatusCode.InternalServerError, messageKey = MessageKeys.CATALOG_FAILED, message = "Failed to retrieve catalog item: ${e.message}")
                     }
                 }
                 
@@ -285,13 +286,13 @@ fun Application.configureRewardRoutes() {
                         val request = call.receive<ClaimRewardCatalogRequest>()
                         
                         val response = service.claimRewardCatalog(userId, request)
-                        call.respondApi(response, response.message, HttpStatusCode.Created)
+                        call.respondApi(response, statusCode = HttpStatusCode.Created, message = response.message)
                     } catch (e: IllegalArgumentException) {
-                        call.respondError(HttpStatusCode.BadRequest, e.message ?: "Invalid request")
+                        call.respondError(HttpStatusCode.BadRequest, messageKey = MessageKeys.INVALID_REQUEST, message = e.message)
                     } catch (e: IllegalStateException) {
-                        call.respondError(HttpStatusCode.BadRequest, e.message ?: "Cannot claim reward")
+                        call.respondError(HttpStatusCode.BadRequest, messageKey = MessageKeys.CANNOT_CLAIM_REWARD, message = e.message)
                     } catch (e: Exception) {
-                        call.respondError(HttpStatusCode.InternalServerError, "Failed to claim reward: ${e.message}")
+                        call.respondError(HttpStatusCode.InternalServerError, messageKey = MessageKeys.CATALOG_CLAIM_FAILED, message = "Failed to claim reward: ${e.message}")
                     }
                 }
                 
@@ -309,9 +310,9 @@ fun Application.configureRewardRoutes() {
                         val offset = call.request.queryParameters["offset"]?.toIntOrNull() ?: 0
                         
                         val transactions = service.getUserTransactions(userId, limit, offset)
-                        call.respondApi(transactions, "Transactions retrieved successfully")
+                        call.respondApi(transactions, messageKey = MessageKeys.TRANSACTIONS_RETRIEVED)
                     } catch (e: Exception) {
-                        call.respondError(HttpStatusCode.InternalServerError, "Failed to retrieve transactions: ${e.message}")
+                        call.respondError(HttpStatusCode.InternalServerError, messageKey = MessageKeys.TRANSACTIONS_FAILED, message = "Failed to retrieve transactions: ${e.message}")
                     }
                 }
                 
@@ -333,11 +334,11 @@ fun Application.configureRewardRoutes() {
                             throw IllegalArgumentException("Transaction not found")
                         }
                         
-                        call.respondApi(transaction, "Transaction retrieved successfully")
+                        call.respondApi(transaction, messageKey = MessageKeys.TRANSACTION_RETRIEVED)
                     } catch (e: IllegalArgumentException) {
-                        call.respondError(HttpStatusCode.BadRequest, e.message ?: "Invalid request")
+                        call.respondError(HttpStatusCode.BadRequest, messageKey = MessageKeys.INVALID_REQUEST, message = e.message)
                     } catch (e: Exception) {
-                        call.respondError(HttpStatusCode.InternalServerError, "Failed to retrieve transaction: ${e.message}")
+                        call.respondError(HttpStatusCode.InternalServerError, messageKey = MessageKeys.TRANSACTIONS_FAILED, message = "Failed to retrieve transaction: ${e.message}")
                     }
                 }
             }

@@ -1,5 +1,6 @@
 package com.apptime.code.consents
 
+import com.apptime.code.common.MessageKeys
 import com.apptime.code.common.respondApi
 import com.apptime.code.common.respondError
 import com.apptime.code.common.requireUserId
@@ -25,9 +26,9 @@ fun Application.configureConsentRoutes() {
             get {
                 try {
                     val templates = service.getConsentTemplates()
-                    call.respondApi(templates, "Consent templates retrieved successfully")
+                    call.respondApi(templates, messageKey = MessageKeys.CONSENT_TEMPLATES_RETRIEVED)
                 } catch (e: Exception) {
-                    call.respondError(HttpStatusCode.InternalServerError, "Failed to retrieve consent templates: ${e.message}")
+                    call.respondError(HttpStatusCode.InternalServerError, messageKey = MessageKeys.CONSENT_TEMPLATES_FAILED, message = "Failed to retrieve consent templates: ${e.message}")
                 }
             }
             
@@ -40,11 +41,11 @@ fun Application.configureConsentRoutes() {
                     try {
                         val userId = call.requireUserId()
                         val userConsents = service.getUserConsents(userId)
-                        call.respondApi(userConsents, "User consents retrieved successfully")
+                        call.respondApi(userConsents, messageKey = MessageKeys.USER_CONSENTS_RETRIEVED)
                     } catch (e: IllegalArgumentException) {
-                        call.respondError(HttpStatusCode.BadRequest, e.message ?: "Invalid request")
+                        call.respondError(HttpStatusCode.BadRequest, messageKey = MessageKeys.INVALID_REQUEST, message = e.message)
                     } catch (e: Exception) {
-                        call.respondError(HttpStatusCode.InternalServerError, "Failed to retrieve user consents: ${e.message}")
+                        call.respondError(HttpStatusCode.InternalServerError, messageKey = MessageKeys.USER_CONSENTS_FAILED, message = "Failed to retrieve user consents: ${e.message}")
                     }
                 }
                 
@@ -57,11 +58,11 @@ fun Application.configureConsentRoutes() {
                         val userId = call.requireUserId()
                         val request = call.receive<ConsentSubmissionRequest>()
                         val results = service.submitConsents(userId, request)
-                        call.respondApi(results, "Consents submitted successfully", HttpStatusCode.Created)
+                        call.respondApi(results, statusCode = HttpStatusCode.Created, messageKey = MessageKeys.CONSENTS_SUBMITTED)
                     } catch (e: IllegalArgumentException) {
-                        call.respondError(HttpStatusCode.BadRequest, e.message ?: "Invalid request")
+                        call.respondError(HttpStatusCode.BadRequest, messageKey = MessageKeys.INVALID_REQUEST, message = e.message)
                     } catch (e: Exception) {
-                        call.respondError(HttpStatusCode.InternalServerError, "Failed to submit consents: ${e.message}")
+                        call.respondError(HttpStatusCode.InternalServerError, messageKey = MessageKeys.CONSENTS_SUBMIT_FAILED, message = "Failed to submit consents: ${e.message}")
                     }
                 }
             }
