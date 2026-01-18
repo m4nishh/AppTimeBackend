@@ -96,13 +96,7 @@ jobs:
             sleep 2
             
             echo "🚀 Starting app.jar"
-            nohup java \
-              -Xms128m \
-              -Xmx384m \
-              -XX:MaxMetaspaceSize=128m \
-              -XX:+UseG1GC \
-              -Dspring.main.lazy-initialization=true \
-              -jar app.jar > app.log 2>&1 &
+            nohup java -Xms128m -Xmx384m -jar "$JAR_FILE" > app.log 2>&1 &
             
             echo "✅ Deployment completed successfully"
 
