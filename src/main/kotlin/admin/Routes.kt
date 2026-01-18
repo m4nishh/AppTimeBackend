@@ -10,10 +10,12 @@ import com.apptime.code.rewards.TransactionStatus
 import com.apptime.code.rewards.CoinSource
 import com.apptime.code.rewards.AddCoinsRequest
 import io.ktor.http.*
+import io.ktor.http.content.*
 import io.ktor.server.application.*
 import io.ktor.server.request.*
 import io.ktor.server.routing.*
 import java.util.*
+import java.io.File
 
 /**
  * Configure admin-related routes
@@ -539,6 +541,119 @@ fun Application.configureAdminRoutes() {
                         call.respondError(HttpStatusCode.BadRequest, messageKey = MessageKeys.INVALID_REQUEST, message = e.message)
                     } catch (e: Exception) {
                         call.respondError(HttpStatusCode.InternalServerError, messageKey = MessageKeys.TRANSACTIONS_FAILED, message = "Failed to update transaction status: ${e.message}")
+                    }
+                }
+            }
+            
+            // Asset Management
+            route("/assets") {
+                // Get list of all assets
+                get {
+                    try {
+                        val assetDir = File("src/main/resources/asset")
+                        val assets = if (assetDir.exists() && assetDir.isDirectory) {
+                            assetDir.listFiles { _, name -> 
+                                name.lowercase().endsWith(".png") || 
+                                name.lowercase().endsWith(".jpg") || 
+                                name.lowercase().endsWith(".jpeg") || 
+                                name.lowercase().endsWith(".gif") || 
+                                name.lowercase().endsWith(".webp")
+                            }?.map { file ->
+                                AssetInfo(
+                                    name = file.name,
+                                    size = file.length(),
+                                    url = "/asset/${file.name}"
+                                )
+                            } ?: emptyList()
+                        } else {
+                            emptyList()
+                        }
+                        call.respondApi(assets, messageKey = MessageKeys.ASSETS_RETRIEVED)
+                    } catch (e: Exception) {
+                        call.respondError(HttpStatusCode.InternalServerError, messageKey = MessageKeys.ASSETS_FAILED, message = "Failed to retrieve assets: ${e.message}")
+                    }
+                }
+                
+                // Upload asset
+                post {
+                    try {
+                        val multipart = call.receiveMultipart()
+                        var fileName: String? = null
+                        var fileBytes: ByteArray? = null
+                        
+                        multipart.forEachPart { part ->
+                            when (part) {
+                                is PartData.FileItem -> {
+                                    fileName = part.originalFileName
+                                    fileBytes = part.streamProvider().readBytes()
+                                }
+                                else -> part.dispose()
+                            }
+                        }
+                        
+                        if (fileName == null || fileBytes == null) {
+                            call.respondError(HttpStatusCode.BadRequest, messageKey = MessageKeys.INVALID_REQUEST, message = "No file provided")
+                            return@post
+                        }
+                        
+                        // Validate file extension
+                        val allowedExtensions = listOf(".png", ".jpg", ".jpeg", ".gif", ".webp")
+                        val fileExtension = fileName!!.substringAfterLast('.', "").lowercase()
+                        if (!allowedExtensions.contains(".$fileExtension")) {
+                            call.respondError(HttpStatusCode.BadRequest, messageKey = MessageKeys.INVALID_REQUEST, message = "Invalid file type. Allowed: ${allowedExtensions.joinToString(", ")}")
+                            return@post
+                        }
+                        
+                        // Ensure asset directory exists
+                        val assetDir = File("src/main/resources/asset")
+                        if (!assetDir.exists()) {
+                            assetDir.mkdirs()
+                        }
+                        
+                        // Save file
+                        val targetFile = File(assetDir, fileName!!)
+                        targetFile.writeBytes(fileBytes!!)
+                        
+                        val assetInfo = AssetInfo(
+                            name = fileName!!,
+                            size = fileBytes!!.size.toLong(),
+                            url = "/asset/${fileName!!}"
+                        )
+                        
+                        call.respondApi(assetInfo, statusCode = HttpStatusCode.Created, messageKey = MessageKeys.ASSET_UPLOADED)
+                    } catch (e: Exception) {
+                        call.respondError(HttpStatusCode.InternalServerError, messageKey = MessageKeys.ASSETS_FAILED, message = "Failed to upload asset: ${e.message}")
+                    }
+                }
+                
+                // Delete asset
+                delete("/{fileName}") {
+                    try {
+                        val fileName = call.parameters["fileName"]
+                            ?: throw IllegalArgumentException("Invalid file name")
+                        
+                        // Security: prevent path traversal
+                        if (fileName.contains("..") || fileName.contains("/") || fileName.contains("\\")) {
+                            throw IllegalArgumentException("Invalid file name")
+                        }
+                        
+                        val assetDir = File("src/main/resources/asset")
+                        val targetFile = File(assetDir, fileName)
+                        
+                        if (!targetFile.exists()) {
+                            call.respondError(HttpStatusCode.NotFound, messageKey = MessageKeys.ASSET_NOT_FOUND)
+                            return@delete
+                        }
+                        
+                        if (targetFile.delete()) {
+                            call.respondApi("", messageKey = MessageKeys.ASSET_DELETED)
+                        } else {
+                            call.respondError(HttpStatusCode.InternalServerError, messageKey = MessageKeys.ASSETS_FAILED, message = "Failed to delete asset")
+                        }
+                    } catch (e: IllegalArgumentException) {
+                        call.respondError(HttpStatusCode.BadRequest, messageKey = MessageKeys.INVALID_REQUEST, message = e.message)
+                    } catch (e: Exception) {
+                        call.respondError(HttpStatusCode.InternalServerError, messageKey = MessageKeys.ASSETS_FAILED, message = "Failed to delete asset: ${e.message}")
                     }
                 }
             }

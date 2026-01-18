@@ -71,6 +71,9 @@ fun Application.module() {
             default("index.html")
         }
         
+        // Serve static assets (images, etc.)
+        staticResources("/asset", "asset")
+        
         get("/") {
             call.respond(
                 mapOf(

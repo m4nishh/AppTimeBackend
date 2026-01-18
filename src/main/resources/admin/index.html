@@ -533,6 +533,7 @@
                 <button class="tab" onclick="showTab('rewards')">🎁 Rewards</button>
                 <button class="tab" onclick="showTab('orders')">📦 Orders</button>
                 <button class="tab" onclick="showTab('features')">🚩 Feature Flags</button>
+                <button class="tab" onclick="showTab('assets')">🖼️ Assets</button>
             </div>
 
             <div id="error-message" class="error" style="display: none;"></div>
@@ -632,6 +633,20 @@
                     <button class="btn btn-primary" onclick="showFeatureModal()">+ Create Feature Flag</button>
                 </div>
                 <div id="features-content" class="loading">Loading feature flags...</div>
+            </div>
+        </div>
+
+        <!-- Assets Tab -->
+        <div id="assets" class="tab-content">
+            <div class="section">
+                <div class="section-header">
+                    <h2>Asset Management</h2>
+                    <button class="btn btn-primary" onclick="showAssetUploadModal()">+ Upload Image</button>
+                </div>
+                <p style="color: var(--text-secondary); margin-bottom: 20px; padding: 15px; background: var(--bg-tertiary); border-radius: 8px;">
+                    <strong>ℹ️ Note:</strong> Upload images to the asset directory. Images will be accessible at <code>/asset/filename</code>
+                </p>
+                <div id="assets-content" class="loading">Loading assets...</div>
             </div>
         </div>
         </div>
@@ -1055,6 +1070,27 @@
         </div>
     </div>
 
+    <!-- Asset Upload Modal -->
+    <div id="assetUploadModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Upload Image</h3>
+                <button class="close" onclick="closeAssetUploadModal()">&times;</button>
+            </div>
+            <form id="assetUploadForm" onsubmit="uploadAsset(event)">
+                <div class="form-group">
+                    <label>Select Image File *</label>
+                    <input type="file" id="assetFile" accept="image/png,image/jpeg,image/jpg,image/gif,image/webp" required>
+                    <small style="color: var(--text-secondary); font-size: 0.85em;">Supported formats: PNG, JPG, JPEG, GIF, WEBP</small>
+                </div>
+                <div class="form-actions">
+                    <button type="button" class="btn btn-secondary" onclick="closeAssetUploadModal()">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Upload</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
     <script>
         const API_BASE = window.location.origin;
         const ADMIN_TOKEN_KEY = 'admin_token';
@@ -1211,6 +1247,7 @@
                 loadRewards();
                 loadRewardCatalog();
             }
+            if (tabName === 'assets') loadAssets();
             if (tabName === 'orders') loadOrders();
             if (tabName === 'features') loadFeatures();
         }
@@ -2458,6 +2495,158 @@
                     loadOrders();
                 } else {
                     showMessage(result.message || 'Failed to update order status');
+                }
+            } catch (err) {
+                showMessage(`Error: ${err.message}`);
+            }
+        }
+
+        // Asset Management Functions
+        async function loadAssets() {
+            try {
+                const response = await fetch(`${API_BASE}/api/admin/assets`);
+                const result = await response.json();
+                
+                if (result.success && result.data) {
+                    displayAssets(result.data);
+                } else {
+                    document.getElementById('assets-content').innerHTML = '<p>No assets found.</p>';
+                }
+            } catch (err) {
+                document.getElementById('assets-content').innerHTML = `<p class="error">Error loading assets: ${err.message}</p>`;
+            }
+        }
+
+        function displayAssets(assets) {
+            if (assets.length === 0) {
+                document.getElementById('assets-content').innerHTML = '<p>No assets uploaded yet.</p>';
+                return;
+            }
+
+            const html = `
+                <table style="width: 100%; border-collapse: collapse;">
+                    <thead>
+                        <tr>
+                            <th style="text-align: left; padding: 12px; border-bottom: 2px solid var(--border-color);">Preview</th>
+                            <th style="text-align: left; padding: 12px; border-bottom: 2px solid var(--border-color);">Name</th>
+                            <th style="text-align: left; padding: 12px; border-bottom: 2px solid var(--border-color);">Size</th>
+                            <th style="text-align: left; padding: 12px; border-bottom: 2px solid var(--border-color);">URL</th>
+                            <th style="text-align: left; padding: 12px; border-bottom: 2px solid var(--border-color);">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${assets.map(asset => `
+                            <tr style="border-bottom: 1px solid var(--border-color);">
+                                <td style="padding: 12px;">
+                                    <img src="${asset.url}" alt="${asset.name}" style="max-width: 100px; max-height: 100px; object-fit: contain; border-radius: 4px; border: 1px solid var(--border-color);">
+                                </td>
+                                <td style="padding: 12px;">${asset.name}</td>
+                                <td style="padding: 12px;">${formatFileSize(asset.size)}</td>
+                                <td style="padding: 12px;">
+                                    <code style="background: var(--bg-tertiary); padding: 4px 8px; border-radius: 4px; font-size: 0.9em;">${asset.url}</code>
+                                    <button class="btn btn-secondary btn-sm" onclick="copyToClipboard('${asset.url}')" style="margin-left: 8px;">Copy</button>
+                                </td>
+                                <td style="padding: 12px;">
+                                    <button class="btn btn-danger btn-sm" onclick="deleteAsset('${asset.name}')">Delete</button>
+                                </td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>
+            `;
+            document.getElementById('assets-content').innerHTML = html;
+        }
+
+        function formatFileSize(bytes) {
+            if (bytes === 0) return '0 Bytes';
+            const k = 1024;
+            const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i];
+        }
+
+        function copyToClipboard(text) {
+            navigator.clipboard.writeText(text).then(() => {
+                showMessage('URL copied to clipboard!', 'success');
+            }).catch(err => {
+                showMessage('Failed to copy URL');
+            });
+        }
+
+        function showAssetUploadModal() {
+            document.getElementById('assetUploadModal').classList.add('active');
+            document.getElementById('assetUploadForm').reset();
+        }
+
+        function closeAssetUploadModal() {
+            document.getElementById('assetUploadModal').classList.remove('active');
+            document.getElementById('assetUploadForm').reset();
+        }
+
+        async function uploadAsset(event) {
+            event.preventDefault();
+            const fileInput = document.getElementById('assetFile');
+            const file = fileInput.files[0];
+            
+            if (!file) {
+                showMessage('Please select a file');
+                return;
+            }
+
+            // Validate file type
+            const allowedTypes = ['image/png', 'image/jpeg', 'image/jpg', 'image/gif', 'image/webp'];
+            if (!allowedTypes.includes(file.type)) {
+                showMessage('Invalid file type. Please select an image file (PNG, JPG, JPEG, GIF, WEBP)');
+                return;
+            }
+
+            // Validate file size (max 10MB)
+            const maxSize = 10 * 1024 * 1024; // 10MB
+            if (file.size > maxSize) {
+                showMessage('File size too large. Maximum size is 10MB');
+                return;
+            }
+
+            try {
+                const formData = new FormData();
+                formData.append('file', file);
+
+                const response = await fetch(`${API_BASE}/api/admin/assets`, {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const result = await response.json();
+                
+                if (result.success) {
+                    showMessage(result.message || 'Image uploaded successfully', 'success');
+                    closeAssetUploadModal();
+                    loadAssets();
+                } else {
+                    showMessage(result.message || 'Failed to upload image');
+                }
+            } catch (err) {
+                showMessage(`Error: ${err.message}`);
+            }
+        }
+
+        async function deleteAsset(fileName) {
+            if (!confirm(`Are you sure you want to delete "${fileName}"?`)) {
+                return;
+            }
+
+            try {
+                const response = await fetch(`${API_BASE}/api/admin/assets/${encodeURIComponent(fileName)}`, {
+                    method: 'DELETE'
+                });
+
+                const result = await response.json();
+                
+                if (result.success) {
+                    showMessage(result.message || 'Asset deleted successfully', 'success');
+                    loadAssets();
+                } else {
+                    showMessage(result.message || 'Failed to delete asset');
                 }
             } catch (err) {
                 showMessage(`Error: ${err.message}`);

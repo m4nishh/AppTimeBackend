@@ -100,3 +100,10 @@ data class SystemStats(
     val timezone: String
 )
 
+@Serializable
+data class AssetInfo(
+    val name: String,
+    val size: Long,
+    val url: String
+)
+

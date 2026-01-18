@@ -67,6 +67,13 @@ object MessageKeys {
     const val TRANSACTION_NOT_FOUND = "transaction.not_found"
     const val TRANSACTIONS_FAILED = "transactions.failed"
     
+    // Asset messages
+    const val ASSETS_RETRIEVED = "assets.retrieved"
+    const val ASSET_UPLOADED = "asset.uploaded"
+    const val ASSET_DELETED = "asset.deleted"
+    const val ASSET_NOT_FOUND = "asset.not_found"
+    const val ASSETS_FAILED = "assets.failed"
+    
     // User/Profile messages
     const val DEVICE_REGISTERED = "user.device.registered"
     const val REGISTRATION_FAILED = "user.registration.failed"
