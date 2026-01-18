@@ -63,7 +63,6 @@ jobs:
       
     # Option 1: Deploy to server via SSH (Recommended for production)
     - name: Deploy to server via SSH
-      if: ${{ secrets.DEPLOY_HOST != '' }}
       uses: appleboy/scp-action@master
       with:
         host: ${{ secrets.DEPLOY_HOST }}
@@ -75,7 +74,6 @@ jobs:
         strip_components: 0
         
     - name: Restart application on GCP VM
-      if: ${{ secrets.DEPLOY_HOST != '' }}
       uses: appleboy/ssh-action@master
       with:
         host: ${{ secrets.DEPLOY_HOST }}
@@ -191,7 +189,6 @@ jobs:
           tail -n 20 app.log
       
     - name: Verify deployment health
-      if: ${{ secrets.DEPLOY_HOST != '' }}
       uses: appleboy/ssh-action@master
       with:
         host: ${{ secrets.DEPLOY_HOST }}
@@ -223,18 +220,16 @@ jobs:
       
     # Option 2: Deploy to Google Cloud Run (Alternative deployment method)
     # Uncomment and configure if you want to use Cloud Run instead of SSH
+    # Note: Comment out the SSH deployment steps above if using Cloud Run
     # - name: Authenticate to Google Cloud
-    #   if: ${{ secrets.GCP_SA_KEY != '' }}
     #   uses: google-github-actions/auth@v2
     #   with:
     #     credentials_json: ${{ secrets.GCP_SA_KEY }}
     #     
     # - name: Set up Cloud SDK
-    #   if: ${{ secrets.GCP_SA_KEY != '' }}
     #   uses: google-github-actions/setup-gcloud@v2
     #   
     # - name: Deploy to Cloud Run
-    #   if: ${{ secrets.GCP_SA_KEY != '' }}
     #   run: |
     #     gcloud run deploy apptime-backend \
     #       --source . \
@@ -252,11 +247,5 @@ jobs:
         echo "- **Status**: ${{ job.status }}" >> $GITHUB_STEP_SUMMARY
         echo "- **Branch**: ${{ github.ref }}" >> $GITHUB_STEP_SUMMARY
         echo "- **Commit**: ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
-        if [ "${{ secrets.DEPLOY_HOST }}" != "" ]; then
-          echo "- **Deployment Method**: SSH to ${{ secrets.DEPLOY_HOST }}" >> $GITHUB_STEP_SUMMARY
-        elif [ "${{ secrets.GCP_SA_KEY }}" != "" ]; then
-          echo "- **Deployment Method**: Google Cloud Run" >> $GITHUB_STEP_SUMMARY
-        else
-          echo "- **Deployment Method**: Not configured" >> $GITHUB_STEP_SUMMARY
-        fi
+        echo "- **Deployment Method**: SSH to GCP VM" >> $GITHUB_STEP_SUMMARY
 
