@@ -89,16 +89,27 @@ jobs:
             fi
             
             echo "✅ Found JAR at $JAR_PATH"
-            mv "$JAR_PATH" ./app.jar
+            mv -f "$JAR_PATH" ./app.jar
             
             echo "🛑 Stopping old app (if any)"
             pkill -f "java.*app.jar" || true
             sleep 2
             
             echo "🚀 Starting app.jar"
-            nohup java -Xms128m -Xmx384m -jar "$JAR_FILE" > app.log 2>&1 &
+            
+            # 🔑 FULLY DETACH FROM SSH SESSION
+            setsid nohup java \
+              -Xms128m \
+              -Xmx384m \
+              -XX:MaxMetaspaceSize=128m \
+              -XX:+UseG1GC \
+              -Dspring.main.lazy-initialization=true \
+              -jar app.jar > app.log 2>&1 < /dev/null &
+            
+            disown || true
             
             echo "✅ Deployment completed successfully"
+            exit 0
 
 
       - name: Deployment summary
