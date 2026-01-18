@@ -1,0 +1,262 @@
+name: Build and Deploy
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+  workflow_dispatch: # Allows manual triggering
+
+env:
+  JAVA_VERSION: '17'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Set up JDK ${{ env.JAVA_VERSION }}
+      uses: actions/setup-java@v4
+      with:
+        java-version: ${{ env.JAVA_VERSION }}
+        distribution: 'temurin'
+        cache: 'gradle'
+        
+    - name: Make gradlew executable
+      run: chmod +x ./gradlew
+      
+    - name: Build with Gradle
+      run: ./gradlew clean build shadowJar --no-daemon
+      
+    - name: Upload build artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: app-jar
+        path: build/libs/*.jar
+        retention-days: 7
+        
+    - name: Display build info
+      run: |
+        echo "Build completed successfully!"
+        ls -lh build/libs/*.jar
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Download build artifacts
+      uses: actions/download-artifact@v4
+      with:
+        name: app-jar
+        path: build/libs/
+        
+    - name: Display JAR files
+      run: ls -lh build/libs/
+      
+    # Option 1: Deploy to server via SSH (Recommended for production)
+    - name: Deploy to server via SSH
+      if: ${{ secrets.DEPLOY_HOST != '' }}
+      uses: appleboy/scp-action@master
+      with:
+        host: ${{ secrets.DEPLOY_HOST }}
+        username: ${{ secrets.DEPLOY_USER }}
+        key: ${{ secrets.DEPLOY_SSH_KEY }}
+        port: ${{ secrets.DEPLOY_PORT || 22 }}
+        source: "build/libs/*.jar"
+        target: "${{ secrets.DEPLOY_PATH || '/opt/apptime-backend' }}/"
+        strip_components: 0
+        
+    - name: Restart application on GCP VM
+      if: ${{ secrets.DEPLOY_HOST != '' }}
+      uses: appleboy/ssh-action@master
+      with:
+        host: ${{ secrets.DEPLOY_HOST }}
+        username: ${{ secrets.DEPLOY_USER }}
+        key: ${{ secrets.DEPLOY_SSH_KEY }}
+        port: ${{ secrets.DEPLOY_PORT || 22 }}
+        script: |
+          set -e
+          DEPLOY_DIR="${{ secrets.DEPLOY_PATH || '/opt/apptime-backend' }}"
+          cd "$DEPLOY_DIR"
+          
+          echo "📦 Deployment directory: $DEPLOY_DIR"
+          echo "📋 Current JAR files:"
+          ls -lh *.jar 2>/dev/null || echo "No JAR files found yet"
+          
+          # Stop existing application if running
+          if [ -f app.pid ]; then
+            PID=$(cat app.pid)
+            if ps -p $PID > /dev/null 2>&1; then
+              echo "🛑 Stopping existing application (PID: $PID)..."
+              kill $PID || true
+              sleep 3
+              # Force kill if still running
+              if ps -p $PID > /dev/null 2>&1; then
+                echo "⚠️  Force killing process..."
+                kill -9 $PID || true
+                sleep 2
+              fi
+            fi
+            rm -f app.pid
+          fi
+          
+          # Also check for any Java processes running the app
+          pkill -f "AppTimeBackend.*jar" || true
+          sleep 2
+          
+          # Find the latest JAR file
+          JAR_FILE=$(ls -t AppTimeBackend*.jar 2>/dev/null | head -n 1)
+          if [ -z "$JAR_FILE" ]; then
+            echo "❌ Error: No JAR file found in $DEPLOY_DIR"
+            ls -la
+            exit 1
+          fi
+          
+          echo "✅ Found JAR file: $JAR_FILE"
+          
+          # Set environment variables (database is localhost since it's in the same VM)
+          export DATABASE_URL="${{ secrets.DATABASE_URL || 'jdbc:postgresql://localhost:5432/screentime_db' }}"
+          export DB_USER="${{ secrets.DB_USER || 'postgres' }}"
+          export DB_PASSWORD="${{ secrets.DB_PASSWORD }}"
+          export PORT="${PORT:-8080}"
+          
+          # Verify database is accessible (optional check)
+          echo "🔍 Checking database connectivity..."
+          if command -v psql &> /dev/null; then
+            PGPASSWORD="$DB_PASSWORD" psql -h localhost -U "$DB_USER" -d postgres -c "SELECT 1;" > /dev/null 2>&1 && echo "✅ Database connection OK" || echo "⚠️  Database connection check skipped"
+          fi
+          
+          # Clean up old log files (keep last 5)
+          if [ -f app.log ]; then
+            tail -n 1000 app.log > app.log.tmp && mv app.log.tmp app.log
+          fi
+          
+          echo "🚀 Starting application with $JAR_FILE..."
+          echo "📝 Database URL: $DATABASE_URL"
+          echo "📝 Port: $PORT"
+          
+          # Start the application in background
+          nohup java -Xmx512m -Xms256m \
+            -Duser.timezone=Asia/Kolkata \
+            -Duser.country=IN \
+            -Duser.language=en \
+            -jar "$JAR_FILE" > app.log 2>&1 &
+          
+          APP_PID=$!
+          echo $APP_PID > app.pid
+          
+          echo "⏳ Waiting for application to start (PID: $APP_PID)..."
+          sleep 8
+          
+          # Check if process is still running
+          if ps -p $APP_PID > /dev/null 2>&1; then
+            echo "✅ Process is running (PID: $APP_PID)"
+            
+            # Check if application is responding
+            echo "🔍 Checking health endpoint..."
+            for i in {1..10}; do
+              if curl -s -f http://localhost:$PORT/health > /dev/null 2>&1; then
+                echo "✅ Application is healthy and responding!"
+                echo "🌐 Application URL: http://localhost:$PORT"
+                break
+              else
+                if [ $i -eq 10 ]; then
+                  echo "⚠️  Health check failed after 10 attempts"
+                  echo "📋 Last 30 lines of app.log:"
+                  tail -n 30 app.log
+                else
+                  echo "⏳ Waiting for health check... ($i/10)"
+                  sleep 2
+                fi
+              fi
+            done
+          else
+            echo "❌ Application failed to start. Process died."
+            echo "📋 Last 50 lines of app.log:"
+            tail -n 50 app.log
+            exit 1
+          fi
+          
+          # Display recent log entries
+          echo ""
+          echo "📋 Recent application logs:"
+          tail -n 20 app.log
+      
+    - name: Verify deployment health
+      if: ${{ secrets.DEPLOY_HOST != '' }}
+      uses: appleboy/ssh-action@master
+      with:
+        host: ${{ secrets.DEPLOY_HOST }}
+        username: ${{ secrets.DEPLOY_USER }}
+        key: ${{ secrets.DEPLOY_SSH_KEY }}
+        port: ${{ secrets.DEPLOY_PORT || 22 }}
+        script: |
+          DEPLOY_DIR="${{ secrets.DEPLOY_PATH || '/opt/apptime-backend' }}"
+          PORT="${PORT:-8080}"
+          
+          echo "🔍 Final health check..."
+          if curl -s -f http://localhost:$PORT/health > /dev/null 2>&1; then
+            echo "✅ Deployment successful! Application is healthy."
+            echo "📊 Application status:"
+            curl -s http://localhost:$PORT/health | head -n 5 || true
+          else
+            echo "⚠️  Health check endpoint not responding"
+            echo "📋 Checking process status..."
+            if [ -f "$DEPLOY_DIR/app.pid" ]; then
+              PID=$(cat "$DEPLOY_DIR/app.pid")
+              if ps -p $PID > /dev/null 2>&1; then
+                echo "✅ Process is running (PID: $PID)"
+                echo "📋 Check logs: tail -f $DEPLOY_DIR/app.log"
+              else
+                echo "❌ Process is not running"
+              fi
+            fi
+          fi
+      
+    # Option 2: Deploy to Google Cloud Run (Alternative deployment method)
+    # Uncomment and configure if you want to use Cloud Run instead of SSH
+    # - name: Authenticate to Google Cloud
+    #   if: ${{ secrets.GCP_SA_KEY != '' }}
+    #   uses: google-github-actions/auth@v2
+    #   with:
+    #     credentials_json: ${{ secrets.GCP_SA_KEY }}
+    #     
+    # - name: Set up Cloud SDK
+    #   if: ${{ secrets.GCP_SA_KEY != '' }}
+    #   uses: google-github-actions/setup-gcloud@v2
+    #   
+    # - name: Deploy to Cloud Run
+    #   if: ${{ secrets.GCP_SA_KEY != '' }}
+    #   run: |
+    #     gcloud run deploy apptime-backend \
+    #       --source . \
+    #       --platform managed \
+    #       --region us-central1 \
+    #       --allow-unauthenticated \
+    #       --set-env-vars DATABASE_URL=${{ secrets.DATABASE_URL }},DB_USER=${{ secrets.DB_USER }},DB_PASSWORD=${{ secrets.DB_PASSWORD }} \
+    #       --memory 512Mi \
+    #       --cpu 1
+      
+    - name: Deployment summary
+      if: always()
+      run: |
+        echo "## Deployment Summary" >> $GITHUB_STEP_SUMMARY
+        echo "- **Status**: ${{ job.status }}" >> $GITHUB_STEP_SUMMARY
+        echo "- **Branch**: ${{ github.ref }}" >> $GITHUB_STEP_SUMMARY
+        echo "- **Commit**: ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
+        if [ "${{ secrets.DEPLOY_HOST }}" != "" ]; then
+          echo "- **Deployment Method**: SSH to ${{ secrets.DEPLOY_HOST }}" >> $GITHUB_STEP_SUMMARY
+        elif [ "${{ secrets.GCP_SA_KEY }}" != "" ]; then
+          echo "- **Deployment Method**: Google Cloud Run" >> $GITHUB_STEP_SUMMARY
+        else
+          echo "- **Deployment Method**: Not configured" >> $GITHUB_STEP_SUMMARY
+        fi
+
