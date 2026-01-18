@@ -69,145 +69,32 @@ jobs:
         host: ${{ secrets.GCP_VM_HOST }}
         username: ${{ secrets.GCP_VM_USER }}
         key: ${{ secrets.GCP_SSH_KEY }}
-        port: ${{ secrets.DEPLOY_PORT || 22 }}
+        port:  22 
         script: |
           set -e
-          DEPLOY_DIR="${{ secrets.DEPLOY_PATH || '/opt/apptime-backend' }}"
+          DEPLOY_DIR="/opt/apptime-backend"
           cd "$DEPLOY_DIR"
-          
+    
           echo "📦 Deployment directory: $DEPLOY_DIR"
-          echo "📋 Current JAR files:"
-          ls -lh *.jar 2>/dev/null || echo "No JAR files found yet"
-          
-          # Stop existing application if running
-          if [ -f app.pid ]; then
-            PID=$(cat app.pid)
-            if ps -p $PID > /dev/null 2>&1; then
-              echo "🛑 Stopping existing application (PID: $PID)..."
-              kill $PID || true
-              sleep 3
-              # Force kill if still running
-              if ps -p $PID > /dev/null 2>&1; then
-                echo "⚠️  Force killing process..."
-                kill -9 $PID || true
-                sleep 2
-              fi
-            fi
-            rm -f app.pid
-          fi
-          
-          # Also check for any Java processes running the app
+          ls -lh *.jar || true
+    
           pkill -f "AppTimeBackend.*jar" || true
           sleep 2
-          
-          # Find the latest JAR file
-          JAR_FILE=$(ls -t AppTimeBackend*.jar 2>/dev/null | head -n 1)
+    
+          JAR_FILE=$(ls -t AppTimeBackend*.jar | head -n 1)
           if [ -z "$JAR_FILE" ]; then
-            echo "❌ Error: No JAR file found in $DEPLOY_DIR"
-            ls -la
+            echo "❌ No JAR found"
             exit 1
           fi
-          
-          echo "✅ Found JAR file: $JAR_FILE"
-          
-          # Set environment variables (database is localhost since it's in the same VM)
-          export DATABASE_URL="${{ secrets.DATABASE_URL || 'jdbc:postgresql://localhost:5432/screentime_db' }}"
-          export DB_USER="${{ secrets.DB_USER || 'postgres' }}"
-          export DB_PASSWORD="${{ secrets.DB_PASSWORD }}"
-          export PORT="${PORT:-8080}"
-          
-          # Verify database is accessible (optional check)
-          echo "🔍 Checking database connectivity..."
-          if command -v psql &> /dev/null; then
-            PGPASSWORD="$DB_PASSWORD" psql -h localhost -U "$DB_USER" -d postgres -c "SELECT 1;" > /dev/null 2>&1 && echo "✅ Database connection OK" || echo "⚠️  Database connection check skipped"
-          fi
-          
-          # Clean up old log files (keep last 5)
-          if [ -f app.log ]; then
-            tail -n 1000 app.log > app.log.tmp && mv app.log.tmp app.log
-          fi
-          
-          echo "🚀 Starting application with $JAR_FILE..."
-          echo "📝 Database URL: $DATABASE_URL"
-          echo "📝 Port: $PORT"
-          
-          # Start the application in background
-          nohup java -Xmx512m -Xms256m \
-            -Duser.timezone=Asia/Kolkata \
-            -Duser.country=IN \
-            -Duser.language=en \
+    
+          nohup java -Xms128m -Xmx384m \
+            -Dspring.main.lazy-initialization=true \
             -jar "$JAR_FILE" > app.log 2>&1 &
-          
-          APP_PID=$!
-          echo $APP_PID > app.pid
-          
-          echo "⏳ Waiting for application to start (PID: $APP_PID)..."
-          sleep 8
-          
-          # Check if process is still running
-          if ps -p $APP_PID > /dev/null 2>&1; then
-            echo "✅ Process is running (PID: $APP_PID)"
-            
-            # Check if application is responding
-            echo "🔍 Checking health endpoint..."
-            for i in {1..10}; do
-              if curl -s -f http://localhost:$PORT/health > /dev/null 2>&1; then
-                echo "✅ Application is healthy and responding!"
-                echo "🌐 Application URL: http://localhost:$PORT"
-                break
-              else
-                if [ $i -eq 10 ]; then
-                  echo "⚠️  Health check failed after 10 attempts"
-                  echo "📋 Last 30 lines of app.log:"
-                  tail -n 30 app.log
-                else
-                  echo "⏳ Waiting for health check... ($i/10)"
-                  sleep 2
-                fi
-              fi
-            done
-          else
-            echo "❌ Application failed to start. Process died."
-            echo "📋 Last 50 lines of app.log:"
-            tail -n 50 app.log
-            exit 1
-          fi
-          
-          # Display recent log entries
-          echo ""
-          echo "📋 Recent application logs:"
-          tail -n 20 app.log
+    
+          echo "🚀 App started"
+
       
-    - name: Verify deployment health
-      uses: appleboy/ssh-action@master
-      with:
-        host: ${{ secrets.DEPLOY_HOST }}
-        username: ${{ secrets.DEPLOY_USER }}
-        key: ${{ secrets.DEPLOY_SSH_KEY }}
-        port: ${{ secrets.DEPLOY_PORT || 22 }}
-        script: |
-          DEPLOY_DIR="${{ secrets.DEPLOY_PATH || '/opt/apptime-backend' }}"
-          PORT="${PORT:-8080}"
-          
-          echo "🔍 Final health check..."
-          if curl -s -f http://localhost:$PORT/health > /dev/null 2>&1; then
-            echo "✅ Deployment successful! Application is healthy."
-            echo "📊 Application status:"
-            curl -s http://localhost:$PORT/health | head -n 5 || true
-          else
-            echo "⚠️  Health check endpoint not responding"
-            echo "📋 Checking process status..."
-            if [ -f "$DEPLOY_DIR/app.pid" ]; then
-              PID=$(cat "$DEPLOY_DIR/app.pid")
-              if ps -p $PID > /dev/null 2>&1; then
-                echo "✅ Process is running (PID: $PID)"
-                echo "📋 Check logs: tail -f $DEPLOY_DIR/app.log"
-              else
-                echo "❌ Process is not running"
-              fi
-            fi
-          fi
-      
+   
     # Option 2: Deploy to Google Cloud Run (Alternative deployment method)
     # Uncomment and configure if you want to use Cloud Run instead of SSH
     # Note: Comment out the SSH deployment steps above if using Cloud Run
