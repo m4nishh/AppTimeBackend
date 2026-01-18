@@ -225,6 +225,17 @@ object MessageKeys {
     const val FEATURE_FLAG_DELETED = "feature.flag.deleted"
     const val FEATURE_FLAG_DELETE_FAILED = "feature.flag.delete.failed"
     
+    // Feedback messages
+    const val FEEDBACK_SUBMITTED = "feedback.submitted"
+    const val FEEDBACK_SUBMIT_FAILED = "feedback.submit.failed"
+    const val FEEDBACK_RETRIEVED = "feedback.retrieved"
+    const val FEEDBACK_RETRIEVAL_FAILED = "feedback.retrieval.failed"
+    const val FEEDBACK_NOT_FOUND = "feedback.not_found"
+    const val FEEDBACK_UPDATED = "feedback.updated"
+    const val FEEDBACK_UPDATE_FAILED = "feedback.update.failed"
+    const val FEEDBACK_DELETED = "feedback.deleted"
+    const val FEEDBACK_DELETE_FAILED = "feedback.delete.failed"
+    
     // Common error messages
     const val INVALID_REQUEST = "error.invalid_request"
     const val INTERNAL_SERVER_ERROR = "error.internal_server_error"

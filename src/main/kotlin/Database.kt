@@ -8,6 +8,7 @@ import com.apptime.code.common.EnvLoader
 import com.apptime.code.consents.ConsentSeedData
 import com.apptime.code.consents.ConsentTemplates
 import com.apptime.code.consents.UserConsents
+import feedback.Feedback
 import com.apptime.code.features.FeatureFlags
 import com.apptime.code.focus.FocusSessions
 import com.apptime.code.focus.FocusModeStats
@@ -168,7 +169,10 @@ object DatabaseFactory {
                 FeatureFlags,
                 
                 // App Stats module
-                AppStats
+                AppStats,
+                
+                // Feedback module
+                Feedback
             )
         }
         println("✅ Database tables created/verified!")

@@ -4,6 +4,9 @@ import com.apptime.code.common.EnvLoader
 import com.apptime.code.common.MessageKeys
 import com.apptime.code.common.respondApi
 import com.apptime.code.common.respondError
+import com.apptime.code.feedback.FeedbackRepository
+import feedback.FeedbackService
+import com.apptime.code.feedback.UpdateFeedbackStatusRequest
 import com.apptime.code.rewards.RewardService
 import com.apptime.code.rewards.RewardRepository
 import com.apptime.code.rewards.TransactionStatus
@@ -26,6 +29,8 @@ fun Application.configureAdminRoutes() {
     val adminRepository = AdminRepository()
     val rewardRepository = RewardRepository()
     val rewardService = RewardService(rewardRepository)
+    val feedbackRepository = FeedbackRepository()
+    val feedbackService = FeedbackService(feedbackRepository)
     
     routing {
         route("/api/admin") {
@@ -654,6 +659,123 @@ fun Application.configureAdminRoutes() {
                         call.respondError(HttpStatusCode.BadRequest, messageKey = MessageKeys.INVALID_REQUEST, message = e.message)
                     } catch (e: Exception) {
                         call.respondError(HttpStatusCode.InternalServerError, messageKey = MessageKeys.ASSETS_FAILED, message = "Failed to delete asset: ${e.message}")
+                    }
+                }
+            }
+            
+            // Feedback Management
+            route("/feedback") {
+                /**
+                 * GET /api/admin/feedback
+                 * Get all feedback with optional filters
+                 * Query params: status, category, limit, offset
+                 */
+                get {
+                    try {
+                        val status = call.request.queryParameters["status"]
+                        val category = call.request.queryParameters["category"]
+                        val limit = call.request.queryParameters["limit"]?.toInt()
+                        val offset = call.request.queryParameters["offset"]?.toInt() ?: 0
+                        
+                        val response = feedbackService.getAllFeedback(status, category, limit, offset)
+                        call.respondApi(response, messageKey = MessageKeys.FEEDBACK_RETRIEVED)
+                    } catch (e: Exception) {
+                        call.respondError(HttpStatusCode.InternalServerError, messageKey = MessageKeys.FEEDBACK_RETRIEVAL_FAILED, message = "Failed to retrieve feedback: ${e.message}")
+                    }
+                }
+                
+                /**
+                 * GET /api/admin/feedback/{feedbackId}
+                 * Get feedback by ID
+                 */
+                get("/{feedbackId}") {
+                    try {
+                        val feedbackId = call.parameters["feedbackId"]?.toLongOrNull()
+                            ?: throw IllegalArgumentException("Invalid feedback ID")
+                        
+                        val feedback = feedbackService.getFeedbackById(feedbackId)
+                        if (feedback != null) {
+                            call.respondApi(feedback, messageKey = MessageKeys.FEEDBACK_RETRIEVED)
+                        } else {
+                            call.respondError(HttpStatusCode.NotFound, messageKey = MessageKeys.FEEDBACK_NOT_FOUND, message = "Feedback not found")
+                        }
+                    } catch (e: IllegalArgumentException) {
+                        call.respondError(HttpStatusCode.BadRequest, messageKey = MessageKeys.INVALID_REQUEST, message = e.message)
+                    } catch (e: Exception) {
+                        call.respondError(HttpStatusCode.InternalServerError, messageKey = MessageKeys.FEEDBACK_RETRIEVAL_FAILED, message = "Failed to retrieve feedback: ${e.message}")
+                    }
+                }
+                
+                /**
+                 * PUT /api/admin/feedback/{feedbackId}/status
+                 * Update feedback status
+                 */
+                put("/{feedbackId}/status") {
+                    try {
+                        val feedbackId = call.parameters["feedbackId"]?.toLongOrNull()
+                            ?: throw IllegalArgumentException("Invalid feedback ID")
+                        
+                        val request = call.receive<UpdateFeedbackStatusRequest>()
+                        val response = feedbackService.updateFeedbackStatus(feedbackId, request)
+                        call.respondApi(response, messageKey = MessageKeys.FEEDBACK_UPDATED)
+                    } catch (e: IllegalArgumentException) {
+                        call.respondError(HttpStatusCode.BadRequest, messageKey = MessageKeys.INVALID_REQUEST, message = e.message)
+                    } catch (e: Exception) {
+                        call.respondError(HttpStatusCode.InternalServerError, messageKey = MessageKeys.FEEDBACK_UPDATE_FAILED, message = "Failed to update feedback: ${e.message}")
+                    }
+                }
+                
+                /**
+                 * DELETE /api/admin/feedback/{feedbackId}
+                 * Delete feedback
+                 */
+                delete("/{feedbackId}") {
+                    try {
+                        val feedbackId = call.parameters["feedbackId"]?.toLongOrNull()
+                            ?: throw IllegalArgumentException("Invalid feedback ID")
+                        
+                        val success = feedbackService.deleteFeedback(feedbackId)
+                        if (success) {
+                            call.respondApi(
+                                mapOf(
+                                    "message" to "Feedback deleted successfully",
+                                    "feedbackId" to feedbackId
+                                ),
+                                messageKey = MessageKeys.FEEDBACK_DELETED
+                            )
+                        } else {
+                            call.respondError(HttpStatusCode.NotFound, messageKey = MessageKeys.FEEDBACK_NOT_FOUND, message = "Feedback not found")
+                        }
+                    } catch (e: IllegalArgumentException) {
+                        call.respondError(HttpStatusCode.BadRequest, messageKey = MessageKeys.INVALID_REQUEST, message = e.message)
+                    } catch (e: Exception) {
+                        call.respondError(HttpStatusCode.InternalServerError, messageKey = MessageKeys.FEEDBACK_DELETE_FAILED, message = "Failed to delete feedback: ${e.message}")
+                    }
+                }
+                
+                /**
+                 * GET /api/admin/feedback/stats
+                 * Get feedback statistics
+                 */
+                get("/stats") {
+                    try {
+                        val totalCount = feedbackRepository.getFeedbackCount()
+                        val pendingCount = feedbackRepository.getFeedbackCount(status = "pending")
+                        val reviewedCount = feedbackRepository.getFeedbackCount(status = "reviewed")
+                        val resolvedCount = feedbackRepository.getFeedbackCount(status = "resolved")
+                        val closedCount = feedbackRepository.getFeedbackCount(status = "closed")
+                        
+                        val stats = mapOf(
+                            "total" to totalCount,
+                            "pending" to pendingCount,
+                            "reviewed" to reviewedCount,
+                            "resolved" to resolvedCount,
+                            "closed" to closedCount
+                        )
+                        
+                        call.respondApi(stats, messageKey = MessageKeys.FEEDBACK_RETRIEVED)
+                    } catch (e: Exception) {
+                        call.respondError(HttpStatusCode.InternalServerError, messageKey = MessageKeys.FEEDBACK_RETRIEVAL_FAILED, message = "Failed to retrieve feedback stats: ${e.message}")
                     }
                 }
             }

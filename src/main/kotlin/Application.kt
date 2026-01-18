@@ -6,6 +6,7 @@ import com.apptime.code.challenges.configureChallengeRoutes
 import com.apptime.code.common.configureAuthentication
 import com.apptime.code.common.configureHeaderTracking
 import com.apptime.code.consents.configureConsentRoutes
+import com.apptime.code.feedback.configureFeedbackRoutes
 import com.apptime.code.features.configureFeatureFlagsRoutes
 import com.apptime.code.focus.configureFocusRoutes
 import com.apptime.code.leaderboard.configureLeaderboardRoutes
@@ -60,6 +61,7 @@ fun Application.module() {
     configureChallengeRoutes()
     configureRewardRoutes()
     configureNotificationRoutes()
+    configureFeedbackRoutes()
     configureFeatureFlagsRoutes()
     configureAdminRoutes()
     configureAppStatsRoutes()
