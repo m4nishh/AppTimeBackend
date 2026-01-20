@@ -203,6 +203,38 @@ class NotificationService(
     }
     
     /**
+     * Send challenge winner notification to other users
+     * Notifies all other participants that a user won the challenge and got coins
+     */
+    suspend fun sendChallengeWinnerNotificationToOthers(
+        winnerUserId: String,
+        winnerUsername: String,
+        challengeTitle: String,
+        coins: Long,
+        challengeId: Long,
+        otherUserIds: List<String>
+    ) {
+        // Get username for display (use provided username or fallback to userId)
+        val displayName = if (winnerUsername.isNotBlank()) winnerUsername else winnerUserId
+        
+        // Send notification to all other users
+        for (userId in otherUserIds) {
+            try {
+                createAndSendNotification(
+                    userId = userId,
+                    title = "Challenge Winner! 🎉",
+                    text = "$displayName won the challenge '$challengeTitle' and got $coins coins!",
+                    type = "challenge_winner",
+                    deeplink = "app://challenge/$challengeId"
+                )
+            } catch (e: Exception) {
+                logger.warning("Failed to send challenge winner notification to user $userId: ${e.message}")
+                // Continue with other users even if one fails
+            }
+        }
+    }
+    
+    /**
      * Send focus milestone notification
      */
     suspend fun sendFocusMilestoneNotification(

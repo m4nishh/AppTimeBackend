@@ -494,6 +494,17 @@ class ChallengeRepository {
     }
     
     /**
+     * Get all participants of a challenge
+     */
+    fun getChallengeParticipants(challengeId: Long): List<String> {
+        return dbTransaction {
+            ChallengeParticipants.select {
+                ChallengeParticipants.challengeId eq challengeId
+            }.map { it[ChallengeParticipants.userId] }
+        }
+    }
+    
+    /**
      * Get last sync time for a user in a challenge
      * Returns the most recent endSyncTime from challenge_participant_stats
      */

@@ -230,6 +230,9 @@ class RewardService(
         // Batch create rewards
         repository.batchCreateRewards(rewardsToCreate)
         
+        // Get all participants of the challenge for sending notifications
+        val allParticipants = challengeRepository?.getChallengeParticipants(challengeId) ?: emptyList()
+        
         // Also add coins for each winner and send notifications
         // Coins are the same amount as points
         var coinsAdded = 0
@@ -250,7 +253,7 @@ class RewardService(
                     coinsAdded++
                 }
                 
-                // Send notification for challenge reward
+                // Send notification for challenge reward to the winner
                 rewardRequest.rank?.let {
                     notificationService?.sendChallengeRewardNotification(
                         userId = rewardRequest.userId,
@@ -259,6 +262,22 @@ class RewardService(
                         coins = rewardRequest.amount,
                         challengeId = challengeId
                     )
+                    
+                    // Get winner's username
+                    val winnerUsername = challengeRepository?.getUsername(rewardRequest.userId) ?: rewardRequest.userId
+                    
+                    // Send notification to all other participants about this winner
+                    val otherParticipants = allParticipants.filter { it != rewardRequest.userId }
+                    if (otherParticipants.isNotEmpty()) {
+                        notificationService?.sendChallengeWinnerNotificationToOthers(
+                            winnerUserId = rewardRequest.userId,
+                            winnerUsername = winnerUsername,
+                            challengeTitle = challenge.title,
+                            coins = rewardRequest.amount,
+                            challengeId = challengeId,
+                            otherUserIds = otherParticipants
+                        )
+                    }
                 }
             } catch (e: Exception) {
                 // Log error but continue with other users
