@@ -99,6 +99,7 @@ object Transactions : Table("transactions") {
     val recipientName = varchar("recipient_name", 255)
     val recipientPhone = varchar("recipient_phone", 50).nullable()
     val recipientEmail = varchar("recipient_email", 255).nullable()
+    val upiId = varchar("upi_id", 100).nullable()
     val shippingAddress = text("shipping_address").nullable() // Full address (required for PHYSICAL, optional for DIGITAL)
     val city = varchar("city", 100).nullable()
     val state = varchar("state", 100).nullable()

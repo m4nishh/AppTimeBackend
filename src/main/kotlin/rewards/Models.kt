@@ -267,6 +267,7 @@ data class Transaction(
     val recipientName: String,
     val recipientPhone: String? = null,
     val recipientEmail: String? = null,
+    val upiId: String? = null,
     val shippingAddress: String? = null, // Required for PHYSICAL rewards, null for DIGITAL
     val city: String? = null,
     val state: String? = null,
@@ -294,6 +295,7 @@ data class ClaimRewardCatalogRequest(
     val recipientName: String,
     val recipientPhone: String? = null,
     val recipientEmail: String? = null,
+    val upiId: String? = null,
     // Shipping fields - required for PHYSICAL rewards, optional for DIGITAL
     val shippingAddress: String? = null,
     val city: String? = null,

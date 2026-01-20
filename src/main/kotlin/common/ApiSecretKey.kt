@@ -38,14 +38,14 @@ fun Application.configureApiSecretKey() {
         
         // Only validate API routes (paths starting with /api)
         // Skip admin routes as they have their own authentication
-        if (isExcluded && path.startsWith("/api") && !path.startsWith("/api/admin")) {
+        if (!isExcluded && path.startsWith("/api") && !path.startsWith("/api/admin")) {
             // Check app version - if below 8, skip secret key validation
             val appVersion = call.request.headers["X-App-Version"]
             val requiresSecretKey = if (appVersion != null) {
                 try {
                     // Parse version number (e.g., "8", "8.0", "8.1.2" -> extract major version)
                     val majorVersion = appVersion.split(".")[0].toIntOrNull() ?: 0
-                    majorVersion >= 8
+                    majorVersion >= 7.1
                 } catch (e: Exception) {
                     // If version parsing fails, require secret key for safety
                     true

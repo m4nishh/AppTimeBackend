@@ -565,6 +565,7 @@ class RewardService(
             recipientName = request.recipientName,
             recipientPhone = request.recipientPhone,
             recipientEmail = request.recipientEmail,
+            upiId = request.upiId,
             shippingAddress = request.shippingAddress,
             city = request.city,
             state = request.state,

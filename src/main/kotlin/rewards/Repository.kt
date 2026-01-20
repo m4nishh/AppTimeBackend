@@ -539,6 +539,7 @@ class RewardRepository {
         recipientName: String,
         recipientPhone: String? = null,
         recipientEmail: String? = null,
+        upiId: String? = null,
         shippingAddress: String? = null,
         city: String? = null,
         state: String? = null,
@@ -559,6 +560,7 @@ class RewardRepository {
                 it[Transactions.recipientName] = recipientName
                 it[Transactions.recipientPhone] = recipientPhone
                 it[Transactions.recipientEmail] = recipientEmail
+                it[Transactions.upiId] = upiId
                 it[Transactions.shippingAddress] = shippingAddress
                 it[Transactions.city] = city
                 it[Transactions.state] = state
@@ -595,6 +597,7 @@ class RewardRepository {
                     recipientName = row[Transactions.recipientName],
                     recipientPhone = row[Transactions.recipientPhone],
                     recipientEmail = row[Transactions.recipientEmail],
+                    upiId = row[Transactions.upiId],
                     shippingAddress = row[Transactions.shippingAddress],
                     city = row[Transactions.city],
                     state = row[Transactions.state],
@@ -644,6 +647,7 @@ class RewardRepository {
                     recipientName = row[Transactions.recipientName],
                     recipientPhone = row[Transactions.recipientPhone],
                     recipientEmail = row[Transactions.recipientEmail],
+                    upiId = row[Transactions.upiId],
                     shippingAddress = row[Transactions.shippingAddress],
                     city = row[Transactions.city],
                     state = row[Transactions.state],
@@ -695,6 +699,7 @@ class RewardRepository {
                         recipientName = row[Transactions.recipientName],
                         recipientPhone = row[Transactions.recipientPhone],
                         recipientEmail = row[Transactions.recipientEmail],
+                        upiId = row[Transactions.upiId],
                         shippingAddress = row[Transactions.shippingAddress],
                         city = row[Transactions.city],
                         state = row[Transactions.state],
