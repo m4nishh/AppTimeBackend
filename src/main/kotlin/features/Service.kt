@@ -30,6 +30,9 @@ class FeatureFlagsService(private val repository: FeatureFlagsRepository) {
         val wallpaperBannerURL = EnvLoader.getEnv("WALLPAPER_BANNER_URL")
         val adWeightage = EnvLoader.getEnv("AD_WEIGHTAGE")?.toIntOrNull()
         val wallpaperBaseURL = EnvLoader.getEnv("WALLPAPER_BASE_URL")
+        val shareUrl = EnvLoader.getEnv("SHARE_URL")
+        val shareTitle = EnvLoader.getEnv("SHARE_TITLE")
+        val shareText = EnvLoader.getEnv("SHARE_TEXT")
         
         return FeatureFlagsResponse(
             features = FeatureFlagsInner(
@@ -37,7 +40,10 @@ class FeatureFlagsService(private val repository: FeatureFlagsRepository) {
                 challangeBannerURL = challengeBannerURL,
                 wallpaperBannerURL = wallpaperBannerURL,
                 adWeightage = adWeightage,
-                wallpaperBaseURL = wallpaperBaseURL
+                wallpaperBaseURL = wallpaperBaseURL,
+                shareUrl = shareUrl,
+                shareTitle = shareTitle,
+                shareText = shareText
             )
         )
     }

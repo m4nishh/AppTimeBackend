@@ -38,7 +38,10 @@ data class FeatureFlagsInner(
     val challangeBannerURL: String? = null, // Challenge banner URL (note: keeping user's spelling)
     val wallpaperBannerURL: String? = null, // Wallpaper banner URL
     val adWeightage: Int? = null, // Ad weightage
-    val wallpaperBaseURL: String? = null // Wallpaper base URL
+    val wallpaperBaseURL: String? = null, // Wallpaper base URL
+    val shareUrl: String? = null, // Share URL
+    val shareTitle: String? = null, // Share title
+    val shareText: String? = null // Share text
 )
 
 /**
@@ -89,6 +92,9 @@ data class FeatureConfiguration(
     val wallpaperBannerURL: String? = null,
     val adWeightage: Int? = null,
     val wallpaperBaseURL: String? = null,
+    val shareUrl: String? = null,
+    val shareTitle: String? = null,
+    val shareText: String? = null,
     val updatedAt: String? = null
 )
 
@@ -100,6 +106,9 @@ data class UpdateFeatureConfigurationRequest(
     val challengeBannerURL: String? = null,
     val wallpaperBannerURL: String? = null,
     val adWeightage: Int? = null,
-    val wallpaperBaseURL: String? = null
+    val wallpaperBaseURL: String? = null,
+    val shareUrl: String? = null,
+    val shareTitle: String? = null,
+    val shareText: String? = null
 )
 
