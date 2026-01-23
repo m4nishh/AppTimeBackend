@@ -1,6 +1,8 @@
 package com.apptime.code.challenges
 
 import com.apptime.code.notifications.NotificationService
+import com.apptime.code.rewards.ChallengeRewardsQueueService
+import kotlinx.datetime.Clock
 import kotlinx.datetime.Instant
 import java.time.LocalDate
 
@@ -76,8 +78,19 @@ class ChallengeService(
      * @param userId Optional user ID to check if user has joined the challenge
      */
     suspend fun getChallengeDetail(challengeId: Long, userId: String? = null): ChallengeDetail {
-        return repository.getChallengeDetail(challengeId, userId)
+        val challenge = repository.getChallengeDetail(challengeId, userId)
             ?: throw IllegalArgumentException("Challenge not found")
+        
+        // Event-driven: If challenge just ended, enqueue reward awarding immediately
+        // This ensures users get coins as soon as they check challenge details
+        val now = Clock.System.now()
+        val endTime = Instant.parse(challenge.endTime)
+        if (!challenge.isActive && endTime <= now) {
+            // Challenge has ended - enqueue reward awarding (idempotent, safe to call multiple times)
+            ChallengeRewardsQueueService.enqueue(challengeId)
+        }
+        
+        return challenge
     }
     
     /**
@@ -200,6 +213,15 @@ class ChallengeService(
     ): ChallengeRankResponse {
         val challenge = repository.getChallengeById(challengeId)
             ?: throw IllegalArgumentException("Challenge not found")
+        
+        // Event-driven: If challenge just ended, enqueue reward awarding immediately
+        // This ensures users get coins as soon as they check rankings
+        val now = Clock.System.now()
+        val endTime = Instant.parse(challenge.endTime)
+        if (!challenge.isActive && endTime <= now) {
+            // Challenge has ended - enqueue reward awarding (idempotent, safe to call multiple times)
+            ChallengeRewardsQueueService.enqueue(challengeId)
+        }
         
         // Get top 10 rankings
         val rankings = repository.getChallengeRankings(challengeId, challenge.challengeType, limit = 10)

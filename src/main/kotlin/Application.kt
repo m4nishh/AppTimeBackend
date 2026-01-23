@@ -14,7 +14,12 @@ import com.apptime.code.leaderboard.configureLeaderboardRoutes
 import com.apptime.code.appstats.configureAppStatsRoutes
 import com.apptime.code.location.configureLocationRoutes
 import com.apptime.code.notifications.FirebaseNotificationService
+import com.apptime.code.notifications.NotificationQueueService
+import com.apptime.code.notifications.NotificationService
+import com.apptime.code.notifications.NotificationRepository
 import com.apptime.code.notifications.configureNotificationRoutes
+import users.UserRepository
+import kotlinx.coroutines.CoroutineScope
 import com.apptime.code.rewards.configureRewardRoutes
 import com.apptime.code.common.TranslationService
 import users.configureUserRoutes
@@ -33,6 +38,22 @@ fun Application.module() {
     
     // Initialize Firebase for push notifications
     FirebaseNotificationService.initialize()
+    
+    // Initialize notification queue consumer
+    val notificationRepository = NotificationRepository()
+    val userRepository = UserRepository()
+    val notificationService = NotificationService(notificationRepository, userRepository)
+    
+    // Start notification queue consumer (processes notifications asynchronously)
+    // Application extends CoroutineScope, so we can use it directly
+    val appScope = this
+    try {
+        NotificationQueueService.startConsumer(notificationService, appScope, maxConcurrentWorkers = 5)
+        println("✅ Notification queue consumer started successfully with 5 workers")
+    } catch (e: Exception) {
+        println("❌ ERROR: Failed to start notification queue consumer: ${e.message}")
+        e.printStackTrace()
+    }
     
     // Initialize translation service (loads all translation files)
     val loadedLanguages = TranslationService.getAvailableLanguages()

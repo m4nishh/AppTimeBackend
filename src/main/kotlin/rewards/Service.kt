@@ -2,6 +2,7 @@ package com.apptime.code.rewards
 
 import com.apptime.code.challenges.ChallengeRepository
 import com.apptime.code.notifications.NotificationService
+import com.apptime.code.notifications.NotificationQueueService
 import kotlinx.datetime.Clock
 
 /**
@@ -191,8 +192,8 @@ class RewardService(
             
             val points = when (currentRank) {
                 1 -> coins
-                2 -> coins//2
-                3 -> coins//4
+                2 -> coins?.div(2)
+                3 -> coins?.div(4)
                 else -> 0
             }
             
@@ -236,6 +237,7 @@ class RewardService(
         // Also add coins for each winner and send notifications
         // Coins are the same amount as points
         var coinsAdded = 0
+        println("🔄 [RewardService] Starting to award coins for ${rewardsToCreate.size} winners in challenge $challengeId")
         for (rewardRequest in rewardsToCreate) {
             try {
                 // Check if coins were already added (prevent duplicates)
@@ -249,27 +251,35 @@ class RewardService(
                         challengeTitle = rewardRequest.challengeTitle,
                         rank = rewardRequest.rank
                     )
+                    println("💰 [RewardService] Adding ${rewardRequest.amount} coins to user ${rewardRequest.userId} for rank ${rewardRequest.rank}")
                     addCoins(addCoinsRequest)
                     coinsAdded++
+                    println("✅ [RewardService] Successfully added coins to user ${rewardRequest.userId}")
+                } else {
+                    println("⚠️ [RewardService] User ${rewardRequest.userId} already has coins for challenge $challengeId rank ${rewardRequest.rank}, skipping")
                 }
                 
-                // Send notification for challenge reward to the winner
+                // Enqueue notifications instead of sending directly
+                // This decouples reward processing from notification sending
                 rewardRequest.rank?.let {
-                    notificationService?.sendChallengeRewardNotification(
+                    try {
+                        // Enqueue challenge reward notification for the winner
+                        NotificationQueueService.enqueueChallengeRewardNotification(
                         userId = rewardRequest.userId,
                         challengeTitle = challenge.title,
                         rank = it,
                         coins = rewardRequest.amount,
                         challengeId = challengeId
                     )
+                        println("✅ Enqueued challenge reward notification for user ${rewardRequest.userId}, rank $it, challenge ${challenge.title}")
                     
                     // Get winner's username
                     val winnerUsername = challengeRepository?.getUsername(rewardRequest.userId) ?: rewardRequest.userId
                     
-                    // Send notification to all other participants about this winner
+                        // Enqueue notification to all other participants about this winner
                     val otherParticipants = allParticipants.filter { it != rewardRequest.userId }
                     if (otherParticipants.isNotEmpty()) {
-                        notificationService?.sendChallengeWinnerNotificationToOthers(
+                            NotificationQueueService.enqueueChallengeWinnerNotification(
                             winnerUserId = rewardRequest.userId,
                             winnerUsername = winnerUsername,
                             challengeTitle = challenge.title,
@@ -277,6 +287,12 @@ class RewardService(
                             challengeId = challengeId,
                             otherUserIds = otherParticipants
                         )
+                            println("✅ Enqueued challenge winner notification for ${otherParticipants.size} other participants")
+                        }
+                    } catch (e: Exception) {
+                        println("❌ ERROR: Failed to enqueue notifications for user ${rewardRequest.userId} in challenge $challengeId: ${e.message}")
+                        e.printStackTrace()
+                        // Don't throw - coins were already added, notification failure shouldn't block
                     }
                 }
             } catch (e: Exception) {

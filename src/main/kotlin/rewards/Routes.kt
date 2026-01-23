@@ -9,6 +9,7 @@ import io.ktor.http.*
 import io.ktor.server.application.*
 import io.ktor.server.auth.*
 import io.ktor.server.request.*
+import io.ktor.server.response.*
 import io.ktor.server.routing.*
 
 /**
@@ -156,6 +157,14 @@ fun Application.configureRewardRoutes() {
                     } catch (e: Exception) {
                         call.respondError(HttpStatusCode.InternalServerError, messageKey = MessageKeys.CHALLENGE_REWARDS_AWARD_FAILED, message = "Failed to award challenge rewards: ${e.message}")
                     }
+                }
+                
+                /**
+                 * GET /api/rewards/queue/stats
+                 * Debug endpoint to check challenge rewards queue statistics
+                 */
+                get("/queue/stats") {
+                    call.respond(ChallengeRewardsQueueService.stats())
                 }
                 
                 /**

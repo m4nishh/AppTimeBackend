@@ -636,6 +636,47 @@ fun Application.configureUserRoutes() {
                         call.respondError(HttpStatusCode.InternalServerError, messageKey = MessageKeys.TOTP_ACCESS_EXTEND_FAILED, message = "Failed to extend access time: ${e.message}")
                     }
                 }
+
+                /**
+                 * GET /api/v1/user/totp/accessors
+                 * Get list of user IDs who have access to authenticated user's data
+                 * Returns simple list of user IDs for quick access checks
+                 */
+                get("/totp/accessors") {
+                    try {
+                        val userId = call.requireUserId()
+                        val accessorUserIds = service.getAccessorUserIds(userId)
+
+                        call.respondApi(
+                            mapOf("accessorUserIds" to accessorUserIds),
+                            messageKey = MessageKeys.TOTP_ACCESSORS_RETRIEVED
+                        )
+                    } catch (e: IllegalArgumentException) {
+                        call.respondError(HttpStatusCode.BadRequest, messageKey = MessageKeys.INVALID_REQUEST, message = e.message)
+                    } catch (e: Exception) {
+                        call.respondError(HttpStatusCode.InternalServerError, messageKey = MessageKeys.TOTP_ACCESSORS_FAILED, message = "Failed to get accessor list: ${e.message}")
+                    }
+                }
+
+                /**
+                 * GET /api/v1/user/totp/accessible-users
+                 * Get list of user IDs that authenticated user has access to via TOTP or control panel
+                 * Returns simple list of user IDs for quick access checks
+                 */
+                get("/totp/accessible-users") {
+                    try {
+                        val userId = call.requireUserId()
+                        val accessibleNames = service.getAccessibleUserIds(userId)
+                        call.respondApi(
+                            mapOf("accessibleUserIds" to accessibleNames),
+                            messageKey = MessageKeys.TOTP_ACCESSIBLE_USERS_RETRIEVED
+                        )
+                    } catch (e: IllegalArgumentException) {
+                        call.respondError(HttpStatusCode.BadRequest, messageKey = MessageKeys.INVALID_REQUEST, message = e.message)
+                    } catch (e: Exception) {
+                        call.respondError(HttpStatusCode.InternalServerError, messageKey = MessageKeys.TOTP_ACCESSIBLE_USERS_FAILED, message = "Failed to get accessible users list: ${e.message}")
+                    }
+                }
             }
         }
     }

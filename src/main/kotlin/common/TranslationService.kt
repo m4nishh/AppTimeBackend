@@ -98,6 +98,10 @@ object MessageKeys {
     const val TOTP_SESSIONS_FAILED = "totp.sessions.failed"
     const val TOTP_CONTROL_PANEL_RETRIEVED = "totp.control_panel.retrieved"
     const val TOTP_CONTROL_PANEL_FAILED = "totp.control_panel.failed"
+    const val TOTP_ACCESSORS_RETRIEVED = "totp.accessors.retrieved"
+    const val TOTP_ACCESSORS_FAILED = "totp.accessors.failed"
+    const val TOTP_ACCESSIBLE_USERS_RETRIEVED = "totp.accessible.users.retrieved"
+    const val TOTP_ACCESSIBLE_USERS_FAILED = "totp.accessible.users.failed"
     const val TOTP_ACCESS_GRANTED = "totp.access.granted"
     const val TOTP_ACCESS_GRANT_FAILED = "totp.access.grant.failed"
     const val TOTP_ACCESS_REVOKED = "totp.access.revoked"
@@ -235,7 +239,7 @@ object MessageKeys {
     const val FEEDBACK_UPDATE_FAILED = "feedback.update.failed"
     const val FEEDBACK_DELETED = "feedback.deleted"
     const val FEEDBACK_DELETE_FAILED = "feedback.delete.failed"
-    
+
     // Common error messages
     const val INVALID_REQUEST = "error.invalid_request"
     const val INTERNAL_SERVER_ERROR = "error.internal_server_error"

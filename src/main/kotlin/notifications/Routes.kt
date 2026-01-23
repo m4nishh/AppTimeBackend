@@ -32,6 +32,14 @@ fun Application.configureNotificationRoutes() {
         route("/api/notifications") {
             authenticate("auth-bearer") {
                 /**
+                 * Debug: Get notification queue statistics (helps verify consumer is running)
+                 * GET /api/notifications/queue/stats
+                 */
+                get("/queue/stats") {
+                    call.respond(NotificationQueueService.getStatistics())
+                }
+
+                /**
                  * Get user notifications
                  * GET /api/notifications?isRead=true&limit=20&offset=0
                  */

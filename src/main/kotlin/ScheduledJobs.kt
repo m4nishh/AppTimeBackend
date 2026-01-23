@@ -4,6 +4,7 @@ import com.apptime.code.challenges.ChallengeRepository
 import com.apptime.code.challenges.ChallengeService
 import com.apptime.code.leaderboard.LeaderboardRepository
 import com.apptime.code.leaderboard.LeaderboardService
+import com.apptime.code.rewards.ChallengeRewardsQueueService
 import com.apptime.code.rewards.RewardRepository
 import com.apptime.code.rewards.RewardService
 import io.ktor.server.application.*
@@ -21,7 +22,6 @@ class ScheduledJobs(
     private val logger = LoggerFactory.getLogger(ScheduledJobs::class.java)
     private var leaderboardSyncJob: Job? = null
     private var challengeStatsSyncJob: Job? = null
-    private var challengeRewardsJob: Job? = null
 
     /**
      * Start the leaderboard sync job that runs every 10 minutes
@@ -63,6 +63,17 @@ class ScheduledJobs(
                             "Challenges processed: ${result.challengesProcessed}, " +
                             "Stats created: ${result.statsCreated}, " +
                             "Users updated: ${result.usersUpdated}")
+
+                    // After syncing stats, enqueue reward-awarding jobs for challenges that ended recently.
+                    // This replaces "award inside cron" with "enqueue → async worker awards".
+                    val challengeRepository = ChallengeRepository()
+                    val recentlyEndedChallenges = challengeRepository.getRecentlyEndedChallenges()
+                    if (recentlyEndedChallenges.isNotEmpty()) {
+                        logger.info("Enqueuing reward awarding for recently ended challenges: count=${recentlyEndedChallenges.size}")
+                        for (challengeId in recentlyEndedChallenges) {
+                            ChallengeRewardsQueueService.enqueue(challengeId)
+                        }
+                    }
                 } catch (e: Exception) {
                     logger.error("Error during scheduled challenge stats sync: ${e.message}", e)
                 }
@@ -74,43 +85,29 @@ class ScheduledJobs(
     }
 
     /**
-     * Start the challenge rewards job that runs every hour
-     * Checks for ended challenges and awards coins to winners
+     * Start a fast cron job that checks for ended challenges every 2 minutes
+     * This ensures users get coins quickly even if they don't check rankings/details
      */
-    fun startChallengeRewardsJob(scope: CoroutineScope) {
-        logger.info("Starting challenge rewards job - will run every hour")
+    fun startFastChallengeRewardsCheckJob(scope: CoroutineScope) {
+        logger.info("Starting fast challenge rewards check job - will run every 2 minutes")
         
-        challengeRewardsJob = scope.launch {
+        scope.launch {
             while (isActive) {
                 try {
-                    logger.info("Running scheduled challenge rewards check...")
                     val challengeRepository = ChallengeRepository()
                     val recentlyEndedChallenges = challengeRepository.getRecentlyEndedChallenges()
-                    
-                    if (recentlyEndedChallenges.isEmpty()) {
-                        logger.info("No recently ended challenges found")
-                    } else {
-                        logger.info("Found ${recentlyEndedChallenges.size} recently ended challenge(s)")
-                        var totalRewardsAwarded = 0
-                        
+                    if (recentlyEndedChallenges.isNotEmpty()) {
+                        logger.info("Fast check: Enqueuing reward awarding for ${recentlyEndedChallenges.size} recently ended challenge(s)")
                         for (challengeId in recentlyEndedChallenges) {
-                            try {
-                                val response = rewardService.awardChallengeRewards(challengeId, topNRanks = 10)
-                                totalRewardsAwarded += response.rewardsAwarded
-                                logger.info("Challenge $challengeId: ${response.message}")
-                            } catch (e: Exception) {
-                                logger.error("Error awarding rewards for challenge $challengeId: ${e.message}", e)
+                            ChallengeRewardsQueueService.enqueue(challengeId)
                             }
-                        }
-                        
-                        logger.info("Challenge rewards check completed. Total rewards awarded: $totalRewardsAwarded")
                     }
                 } catch (e: Exception) {
-                    logger.error("Error during scheduled challenge rewards check: ${e.message}", e)
+                    logger.error("Error during fast challenge rewards check: ${e.message}", e)
                 }
                 
-                // Wait 1 hour (3,600,000 milliseconds) before next run
-                delay(60 * 60 * 1000L)
+                // Wait 2 minutes (120,000 milliseconds) before next run
+                delay(2 * 60 * 1000L)
             }
         }
     }
@@ -124,8 +121,6 @@ class ScheduledJobs(
         leaderboardSyncJob = null
         challengeStatsSyncJob?.cancel()
         challengeStatsSyncJob = null
-        challengeRewardsJob?.cancel()
-        challengeRewardsJob = null
     }
 }
 
@@ -143,16 +138,31 @@ fun Application.configureScheduledJobs() {
     val rewardRepository = RewardRepository()
     val rewardService = RewardService(rewardRepository, challengeRepository, notificationService)
     val scheduledJobs = ScheduledJobs(leaderboardService, challengeService, rewardService)
+
+    // Start the async challenge rewards queue worker
+    try {
+        println("🚀 [ScheduledJobs] Starting ChallengeRewardsQueueService...")
+        ChallengeRewardsQueueService.startConsumer(
+            scope = this,
+            rewardService = rewardService,
+            maxConcurrentWorkers = 2,
+            topNRanks = 10
+        )
+        println("✅ [ScheduledJobs] ChallengeRewardsQueueService started")
+    } catch (e: Exception) {
+        println("❌ [ScheduledJobs] ERROR starting ChallengeRewardsQueueService: ${e.message}")
+        e.printStackTrace()
+    }
     
     // Start the leaderboard sync job
     // Application extends CoroutineScope in Ktor, so we can use 'this' directly
     //scheduledJobs.startLeaderboardSyncJob(this)
     
     // Start the challenge stats sync job
-    //scheduledJobs.startChallengeStatsSyncJob(this)
+    scheduledJobs.startChallengeStatsSyncJob(this)
     
-    // Start the challenge rewards job (awards coins when challenges end)
-    scheduledJobs.startChallengeRewardsJob(this)
+    // Start fast challenge rewards check (every 2 minutes) for quick coin delivery
+    scheduledJobs.startFastChallengeRewardsCheckJob(this)
     
     // Store reference to stop jobs when application shuts down
     environment.monitor.subscribe(ApplicationStopped) {

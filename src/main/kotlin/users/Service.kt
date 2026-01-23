@@ -407,7 +407,43 @@ class UserService(private val repository: UserRepository) {
             activeSessions = totpAccessors
         )
     }
-    
+
+    /**
+     * Get list of user IDs who have access to current user's data via TOTP or control panel
+     * Returns simple list of user IDs for quick access checks
+     */
+    suspend fun getAccessorUserIds(targetUserId: String): List<String> {
+        if (targetUserId.isBlank()) {
+            throw IllegalArgumentException("User ID is required")
+        }
+
+        // Get active TOTP sessions where target is the current user
+        val activeSessions = repository.getActiveSessionsForTargetUser(targetUserId)
+
+        // Extract user IDs from the sessions
+        return activeSessions.mapNotNull { session ->
+            session["requestingUserId"] as? String
+        }.distinct()
+    }
+
+    /**
+     * Get list of user IDs that current user has access to via TOTP or control panel
+     * Returns simple list of user IDs for quick access checks
+     */
+    suspend fun getAccessibleUserIds(requestingUserId: String): List<String> {
+        if (requestingUserId.isBlank()) {
+            throw IllegalArgumentException("User ID is required")
+        }
+
+        // Get active TOTP sessions where requesting user is the current user
+        val activeSessions = repository.getActiveSessionsForUser(requestingUserId)
+
+        // Extract target user IDs from the sessions
+        return activeSessions.mapNotNull { session ->
+            session["targetUsername"] as? String
+        }.distinct()
+    }
+
     /**
      * Revoke access for a user
      */
