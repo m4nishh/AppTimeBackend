@@ -17,7 +17,9 @@ import com.apptime.code.appstats.AppStats
 import com.apptime.code.location.UserLocations
 import com.apptime.code.notifications.Notifications
 import com.apptime.code.rewards.Coins
+import com.apptime.code.rewards.RewardCatalog
 import com.apptime.code.rewards.Rewards
+import com.apptime.code.rewards.Transactions
 import com.apptime.code.users.Users
 import users.TOTPVerificationSessions
 import com.zaxxer.hikari.HikariConfig
@@ -164,6 +166,8 @@ object DatabaseFactory {
                 // Rewards module
                 Rewards,
                 Coins,
+                RewardCatalog,
+                Transactions,
                 
                 // Features module
                 FeatureFlags,
