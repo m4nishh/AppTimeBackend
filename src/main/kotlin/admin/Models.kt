@@ -107,3 +107,19 @@ data class AssetInfo(
     val url: String
 )
 
+@Serializable
+data class PaginatedUserStats(
+    val users: List<UserSummary>,
+    val totalCount: Long,
+    val page: Int,
+    val pageSize: Int,
+    val totalPages: Int
+)
+
+@Serializable
+data class UserSearchQuery(
+    val username: String? = null,
+    val page: Int = 1,
+    val pageSize: Int = 20
+)
+

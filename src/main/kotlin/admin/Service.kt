@@ -27,5 +27,21 @@ class AdminService(private val repository: StatsRepository) {
             system = systemStats
         )
     }
+    
+    fun getUsersWithPagination(
+        username: String? = null,
+        page: Int = 1,
+        pageSize: Int = 20
+    ): PaginatedUserStats {
+        // Validate pagination parameters
+        val validPage = if (page < 1) 1 else page
+        val validPageSize = when {
+            pageSize < 1 -> 20
+            pageSize > 100 -> 100
+            else -> pageSize
+        }
+        
+        return repository.getUsersWithPagination(username, validPage, validPageSize)
+    }
 }
 

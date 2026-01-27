@@ -90,6 +90,24 @@ fun Application.configureAdminRoutes() {
                 }
             }
             
+            /**
+             * GET /api/admin/users-stats
+             * Get paginated user statistics with search
+             * Query params: username (optional), page (default: 1), pageSize (default: 20, max: 100)
+             */
+            get("/users-stats") {
+                try {
+                    val username = call.request.queryParameters["username"]
+                    val page = call.request.queryParameters["page"]?.toIntOrNull() ?: 1
+                    val pageSize = call.request.queryParameters["pageSize"]?.toIntOrNull() ?: 20
+                    
+                    val paginatedUsers = statsService.getUsersWithPagination(username, page, pageSize)
+                    call.respondApi(paginatedUsers, messageKey = MessageKeys.USERS_RETRIEVED)
+                } catch (e: Exception) {
+                    call.respondError(HttpStatusCode.InternalServerError, messageKey = MessageKeys.USERS_FAILED, message = "Failed to retrieve paginated user stats: ${e.message}")
+                }
+            }
+            
             // Challenge Management
             route("/challenges") {
                 // Get all challenges

@@ -229,5 +229,51 @@ class StatsRepository {
             )
         }
     }
+    
+    fun getUsersWithPagination(
+        username: String? = null,
+        page: Int = 1,
+        pageSize: Int = 20
+    ): PaginatedUserStats {
+        return dbTransaction {
+            val offset = (page - 1) * pageSize
+            
+            // Build query with optional username filter
+            val query = if (username.isNullOrBlank()) {
+                Users.selectAll()
+            } else {
+                Users.select { 
+                    Users.username.lowerCase() like "%${username.lowercase()}%"
+                }
+            }
+            
+            // Get total count for pagination
+            val totalCount = query.count()
+            val totalPages = (totalCount + pageSize - 1) / pageSize
+            
+            // Get paginated results
+            val users = query
+                .orderBy(Users.createdAt to SortOrder.DESC)
+                .limit(pageSize, offset.toLong())
+                .map { row ->
+                    UserSummary(
+                        userId = row[Users.userId],
+                        username = row[Users.username],
+                        deviceId = row[Users.deviceId],
+                        deviceModel = row[Users.model],
+                        createdAt = row[Users.createdAt].toString(),
+                        lastSyncTime = row[Users.lastSyncTime]?.toString()
+                    )
+                }
+            
+            PaginatedUserStats(
+                users = users,
+                totalCount = totalCount,
+                page = page,
+                pageSize = pageSize,
+                totalPages = totalPages.toInt()
+            )
+        }
+    }
 }
 

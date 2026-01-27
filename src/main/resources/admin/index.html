@@ -206,6 +206,17 @@
             font-size: 0.85em;
         }
 
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            background: #9ca3af !important;
+        }
+
+        .btn:disabled:hover {
+            background: #9ca3af !important;
+            transform: none;
+        }
+
         .stats-grid {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
@@ -564,7 +575,58 @@
                     <h2>Users Management</h2>
                     <button class="btn btn-primary" onclick="loadUsers()">🔄 Refresh</button>
                 </div>
+                
+                <!-- Search and Filters -->
+                <div style="margin-bottom: 20px; display: flex; gap: 15px; align-items: center; flex-wrap: wrap;">
+                    <div style="flex: 1; min-width: 250px;">
+                        <input 
+                            type="text" 
+                            id="userSearchInput" 
+                            placeholder="🔍 Search by username..." 
+                            style="width: 100%; padding: 10px 15px; border: 2px solid var(--border-color); border-radius: 8px; background: var(--bg-secondary); color: var(--text-primary); font-size: 1em;"
+                            onkeyup="handleUserSearchKeyup(event)"
+                        >
+                    </div>
+                    <button class="btn btn-primary" onclick="searchUsers()">Search</button>
+                    <button class="btn btn-secondary" onclick="clearUserSearch()">Clear</button>
+                    <label style="color: var(--text-primary); font-weight: 600; margin-left: auto;">Page Size:</label>
+                    <select id="userPageSize" onchange="changeUserPageSize()" style="padding: 8px 12px; border: 2px solid var(--border-color); border-radius: 8px; background: var(--bg-secondary); color: var(--text-primary); font-size: 1em;">
+                        <option value="10">10</option>
+                        <option value="20" selected>20</option>
+                        <option value="50">50</option>
+                        <option value="100">100</option>
+                    </select>
+                </div>
+                
                 <div id="users-content" class="loading">Loading users...</div>
+                
+                <!-- Pagination Controls -->
+                <div id="user-pagination" style="margin-top: 20px; display: none; justify-content: space-between; align-items: center; padding: 15px; background: var(--bg-tertiary); border-radius: 8px;">
+                    <div style="color: var(--text-secondary);">
+                        <span id="user-pagination-info">Showing 0 users</span>
+                    </div>
+                    <div style="display: flex; gap: 10px; align-items: center;">
+                        <button class="btn btn-secondary" id="user-first-page" onclick="goToUserPage(1)">⏮️ First</button>
+                        <button class="btn btn-secondary" id="user-prev-page" onclick="goToPreviousUserPage()">◀️ Previous</button>
+                        <span style="color: var(--text-primary); font-weight: 600; padding: 0 15px;">
+                            Page <span id="user-current-page">1</span> of <span id="user-total-pages">1</span>
+                        </span>
+                        <button class="btn btn-secondary" id="user-next-page" onclick="goToNextUserPage()">Next ▶️</button>
+                        <button class="btn btn-secondary" id="user-last-page" onclick="goToLastUserPage()">Last ⏭️</button>
+                    </div>
+                    <div style="display: flex; gap: 10px; align-items: center;">
+                        <label style="color: var(--text-primary);">Go to page:</label>
+                        <input 
+                            type="number" 
+                            id="user-goto-page" 
+                            min="1" 
+                            value="1" 
+                            style="width: 80px; padding: 5px 10px; border: 2px solid var(--border-color); border-radius: 8px; background: var(--bg-secondary); color: var(--text-primary); text-align: center;"
+                            onkeyup="handleGoToPageKeyup(event)"
+                        >
+                        <button class="btn btn-primary" onclick="goToUserPageFromInput()">Go</button>
+                    </div>
+                </div>
             </div>
         </div>
 
@@ -1493,77 +1555,83 @@
             }
         }
 
+        // Users Management - State variables
+        let currentUserPage = 1;
+        let currentUserPageSize = 20;
+        let currentUserSearch = '';
+        let totalUserPages = 1;
+        let totalUserCount = 0;
+
         // Users Management
-        async function loadUsers() {
+        async function loadUsers(page = currentUserPage, pageSize = currentUserPageSize, username = currentUserSearch) {
             try {
-                const response = await fetch(`${API_BASE}/api/admin/users`);
+                // Build query parameters
+                const params = new URLSearchParams({
+                    page: page,
+                    pageSize: pageSize
+                });
+                
+                if (username && username.trim()) {
+                    params.append('username', username.trim());
+                }
+                
+                const response = await fetch(`${API_BASE}/api/admin/users-stats?${params}`);
                 const result = await response.json();
+                
                 if (result.success && result.data) {
-                    displayUsers(result.data);
+                    currentUserPage = result.data.page;
+                    currentUserPageSize = result.data.pageSize;
+                    totalUserPages = result.data.totalPages;
+                    totalUserCount = result.data.totalCount;
+                    
+                    displayUsers(result.data.users);
+                    updateUserPagination();
                 } else {
                     showMessage(result.message || 'Failed to load users');
+                    document.getElementById('users-content').innerHTML = '<p>Failed to load users.</p>';
                 }
             } catch (err) {
                 showMessage(`Error loading users: ${err.message}`);
                 console.error('Error loading users:', err);
+                document.getElementById('users-content').innerHTML = `<p>Error loading users: ${err.message}</p>`;
             }
         }
 
         function displayUsers(users) {
-            if (users.length === 0) {
-                document.getElementById('users-content').innerHTML = '<p>No users found.</p>';
+            if (!users || users.length === 0) {
+                document.getElementById('users-content').innerHTML = '<p style="text-align: center; padding: 40px; color: var(--text-secondary);">No users found.</p>';
                 return;
             }
             
-            // Debug: log first user to see structure
-            if (users.length > 0) {
-                console.log('Sample user data:', users[0]);
-            }
-            
             const html = `
+                <div style="margin-bottom: 15px; color: var(--text-secondary);">
+                    <strong>Total Users Found:</strong> ${totalUserCount}
+                </div>
                 <table>
                     <thead>
                         <tr>
                             <th>User ID</th>
                             <th>Username</th>
-                            <th>Email</th>
+                            <th>Device ID</th>
                             <th>Device Model</th>
-                            <th>Coins</th>
-                            <th>Status</th>
                             <th>Created</th>
+                            <th>Last Sync</th>
                             <th>Actions</th>
                         </tr>
                     </thead>
                     <tbody>
                         ${users.map(u => {
-                            // Handle isBlocked field - default to false if not present
-                            // Check for true, 'true', 1, or any truthy value
-                            const isBlocked = !!(u.isBlocked === true || u.isBlocked === 'true' || u.isBlocked === 1 || (u.hasOwnProperty('isBlocked') && u.isBlocked));
-                            
-                            // Always show a button - Block for active users, Unblock for blocked users
-                            let blockButtonHtml = '';
-                            if (isBlocked) {
-                                blockButtonHtml = `<button class="btn btn-success btn-sm" onclick="unblockUser('${u.userId}')">Unblock</button>`;
-                            } else {
-                                blockButtonHtml = `<button class="btn btn-danger btn-sm" onclick="blockUser('${u.userId}')">Block</button>`;
-                            }
-                            
-                            const totalCoins = u.totalCoins || 0;
-                            
                             return `
                             <tr>
-                                <td>${u.userId.substring(0, 20)}...</td>
-                                <td>${u.username || 'N/A'}</td>
-                                <td>${u.email || 'N/A'}</td>
+                                <td title="${u.userId}">${u.userId.substring(0, 12)}...</td>
+                                <td><strong>${u.username || '<i style="color: var(--text-secondary);">No username</i>'}</strong></td>
+                                <td title="${u.deviceId}">${u.deviceId ? u.deviceId.substring(0, 12) + '...' : 'N/A'}</td>
                                 <td>${u.deviceModel || 'N/A'}</td>
-                                <td><strong>${totalCoins}</strong> 🪙</td>
-                                <td><span class="badge ${isBlocked ? 'blocked' : 'unblocked'}">${isBlocked ? 'Blocked' : 'Active'}</span></td>
                                 <td>${new Date(u.createdAt).toLocaleDateString()}</td>
+                                <td>${u.lastSyncTime ? new Date(u.lastSyncTime).toLocaleDateString() : 'Never'}</td>
                                 <td class="actions">
-                                    <button class="btn btn-primary btn-sm" onclick="editUser('${u.userId}')">Edit</button>
-                                    <button class="btn btn-success btn-sm" onclick="showAddCoinsModal('${u.userId}', '${u.username || 'N/A'}', ${totalCoins})">Add Coins</button>
-                                    ${blockButtonHtml}
-                                    <button class="btn btn-danger btn-sm" onclick="deleteUser('${u.userId}')">Delete</button>
+                                    <button class="btn btn-primary btn-sm" onclick="viewUserDetails('${u.userId}')">👁️ View</button>
+                                    <button class="btn btn-secondary btn-sm" onclick="editUser('${u.userId}')">✏️ Edit</button>
                                 </td>
                             </tr>
                             `;
@@ -1572,6 +1640,114 @@
                 </table>
             `;
             document.getElementById('users-content').innerHTML = html;
+        }
+        
+        function updateUserPagination() {
+            const paginationDiv = document.getElementById('user-pagination');
+            const infoSpan = document.getElementById('user-pagination-info');
+            const currentPageSpan = document.getElementById('user-current-page');
+            const totalPagesSpan = document.getElementById('user-total-pages');
+            const gotoInput = document.getElementById('user-goto-page');
+            
+            // Update pagination info
+            const startItem = (currentUserPage - 1) * currentUserPageSize + 1;
+            const endItem = Math.min(currentUserPage * currentUserPageSize, totalUserCount);
+            infoSpan.textContent = `Showing ${startItem}-${endItem} of ${totalUserCount} users`;
+            
+            currentPageSpan.textContent = currentUserPage;
+            totalPagesSpan.textContent = totalUserPages || 1;
+            gotoInput.value = currentUserPage;
+            gotoInput.max = totalUserPages || 1;
+            
+            // Enable/disable pagination buttons
+            document.getElementById('user-first-page').disabled = currentUserPage === 1;
+            document.getElementById('user-prev-page').disabled = currentUserPage === 1;
+            document.getElementById('user-next-page').disabled = currentUserPage >= totalUserPages;
+            document.getElementById('user-last-page').disabled = currentUserPage >= totalUserPages;
+            
+            // Show pagination controls
+            paginationDiv.style.display = totalUserPages > 1 ? 'flex' : 'none';
+        }
+        
+        // Pagination navigation functions
+        function goToUserPage(page) {
+            if (page < 1 || page > totalUserPages) return;
+            loadUsers(page, currentUserPageSize, currentUserSearch);
+        }
+        
+        function goToPreviousUserPage() {
+            if (currentUserPage > 1) {
+                goToUserPage(currentUserPage - 1);
+            }
+        }
+        
+        function goToNextUserPage() {
+            if (currentUserPage < totalUserPages) {
+                goToUserPage(currentUserPage + 1);
+            }
+        }
+        
+        function goToLastUserPage() {
+            goToUserPage(totalUserPages);
+        }
+        
+        function goToUserPageFromInput() {
+            const input = document.getElementById('user-goto-page');
+            const page = parseInt(input.value);
+            if (page >= 1 && page <= totalUserPages) {
+                goToUserPage(page);
+            } else {
+                showMessage(`Please enter a page number between 1 and ${totalUserPages}`);
+            }
+        }
+        
+        function handleGoToPageKeyup(event) {
+            if (event.key === 'Enter') {
+                goToUserPageFromInput();
+            }
+        }
+        
+        // Search functions
+        function searchUsers() {
+            const searchInput = document.getElementById('userSearchInput');
+            currentUserSearch = searchInput.value.trim();
+            currentUserPage = 1; // Reset to first page when searching
+            loadUsers(1, currentUserPageSize, currentUserSearch);
+        }
+        
+        function clearUserSearch() {
+            document.getElementById('userSearchInput').value = '';
+            currentUserSearch = '';
+            currentUserPage = 1;
+            loadUsers(1, currentUserPageSize, '');
+        }
+        
+        function handleUserSearchKeyup(event) {
+            if (event.key === 'Enter') {
+                searchUsers();
+            }
+        }
+        
+        function changeUserPageSize() {
+            const select = document.getElementById('userPageSize');
+            currentUserPageSize = parseInt(select.value);
+            currentUserPage = 1; // Reset to first page when changing page size
+            loadUsers(1, currentUserPageSize, currentUserSearch);
+        }
+        
+        // View user details (using existing edit endpoint)
+        async function viewUserDetails(userId) {
+            try {
+                const response = await fetch(`${API_BASE}/api/admin/users/${userId}`);
+                const result = await response.json();
+                if (result.success && result.data) {
+                    showUserModal(result.data);
+                } else {
+                    showMessage('Failed to load user details');
+                }
+            } catch (err) {
+                showMessage(`Error: ${err.message}`);
+            }
         }
 
         function showUserModal(user = null) {
