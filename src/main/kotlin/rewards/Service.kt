@@ -535,51 +535,70 @@ class RewardService(
         userId: String,
         request: ClaimRewardCatalogRequest
     ): ClaimRewardCatalogResponse {
+        // Validate recipient name is provided
+        if (request.recipientName.isBlank()) {
+            throw IllegalArgumentException("Recipient name is required. Please provide the name of the person receiving this reward.")
+        }
+        
         // Check if user has any in-progress transactions
         if (repository.hasInProgressTransaction(userId)) {
-            throw IllegalStateException("You have a reward claim in progress. Please wait until your current order is completed or delivered before claiming another reward.")
+            throw IllegalStateException("You already have a pending reward order. Please wait until your current order (PENDING, PROCESSING, or SHIPPED) is delivered or cancelled before placing a new order.")
         }
         
         // Get reward catalog item
         val catalogItem = repository.getRewardCatalogById(request.rewardCatalogId)
-            ?: throw IllegalArgumentException("Reward not found")
+            ?: throw IllegalArgumentException("Reward not found. The reward with ID ${request.rewardCatalogId} does not exist in our catalog.")
         
         if (!catalogItem.isActive) {
-            throw IllegalStateException("This reward is not currently available")
+            throw IllegalStateException("The reward '${catalogItem.title}' is currently unavailable. This item has been temporarily disabled.")
         }
         
         // Validate reward type and required fields
         val rewardType = try {
             RewardCatalogType.valueOf(catalogItem.rewardType.uppercase())
         } catch (e: IllegalArgumentException) {
-            throw IllegalArgumentException("Invalid reward type in catalog item")
+            throw IllegalArgumentException("Invalid reward configuration. Please contact support.")
         }
         
         // Validate required fields based on reward type
         when (rewardType) {
             RewardCatalogType.PHYSICAL -> {
-                // Physical rewards require shipping address
+                // Physical rewards require full shipping details
                 if (request.shippingAddress.isNullOrBlank()) {
-                    throw IllegalArgumentException("Shipping address is required for physical rewards")
+                    throw IllegalArgumentException("Shipping address is required for physical rewards. Please provide your complete delivery address including street, city, state, and postal code.")
+                }
+                if (request.city.isNullOrBlank()) {
+                    throw IllegalArgumentException("City is required for physical rewards. Please provide the city for delivery.")
+                }
+                if (request.state.isNullOrBlank()) {
+                    throw IllegalArgumentException("State/Province is required for physical rewards. Please provide your state or province.")
+                }
+                if (request.postalCode.isNullOrBlank()) {
+                    throw IllegalArgumentException("Postal/ZIP code is required for physical rewards. Please provide your postal or ZIP code.")
                 }
             }
             RewardCatalogType.DIGITAL -> {
                 // Digital rewards require email or phone
                 if (request.recipientEmail.isNullOrBlank() && request.recipientPhone.isNullOrBlank()) {
-                    throw IllegalArgumentException("Email or phone number is required for digital rewards")
+                    throw IllegalArgumentException("Contact information required. Please provide either an email address or phone number to receive your digital reward.")
+                }
+                // Validate email format if provided
+                if (!request.recipientEmail.isNullOrBlank() && !request.recipientEmail.contains("@")) {
+                    throw IllegalArgumentException("Invalid email address format. Please provide a valid email address.")
                 }
             }
         }
         
         // Check stock availability
         if (catalogItem.stockQuantity != -1 && catalogItem.stockQuantity <= 0) {
-            throw IllegalStateException("This reward is out of stock")
+            throw IllegalStateException("Out of stock. The reward '${catalogItem.title}' is currently out of stock. Please check back later or choose another reward.")
         }
         
         // Check if user has enough coins
         val totalCoins = repository.getTotalCoins(userId)
         if (totalCoins < catalogItem.coinPrice) {
-            throw IllegalStateException("Insufficient coins. You have $totalCoins coins but need ${catalogItem.coinPrice} coins")
+            val shortfall = catalogItem.coinPrice - totalCoins
+            throw IllegalStateException("Insufficient coins. You need ${catalogItem.coinPrice} coins to claim '${catalogItem.title}', but you only have $totalCoins coins (short by $shortfall coins). Complete more challenges to earn more coins!")
         }
         
         // Deduct coins from user's account

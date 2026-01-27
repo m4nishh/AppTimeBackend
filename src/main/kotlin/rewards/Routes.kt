@@ -289,22 +289,55 @@ fun Application.configureRewardRoutes() {
                  * Claim a reward (create a transaction)
                  * Request body: ClaimRewardCatalogRequest
                  * 
-                 * For PHYSICAL rewards: recipientName and shippingAddress are required
+                 * For PHYSICAL rewards: recipientName, shippingAddress, city, state, and postalCode are required
                  * For DIGITAL rewards: recipientName and (recipientEmail OR recipientPhone) are required
                  */
                 post("/catalog/claim") {
+                    var userId: String? = null
                     try {
-                        val userId = call.requireUserId()
+                        userId = call.requireUserId()
                         val request = call.receive<ClaimRewardCatalogRequest>()
                         
+                        println("📦 [Reward Claim] User $userId attempting to claim reward ${request.rewardCatalogId}")
+                        
                         val response = service.claimRewardCatalog(userId, request)
+                        
+                        println("✅ [Reward Claim] Success! User $userId claimed reward. Transaction: ${response.transactionNumber}")
+                        
                         call.respondApi(response, statusCode = HttpStatusCode.Created, message = response.message)
                     } catch (e: IllegalArgumentException) {
-                        call.respondError(HttpStatusCode.BadRequest, messageKey = MessageKeys.INVALID_REQUEST, message = e.message)
+                        // Validation errors (missing fields, invalid data)
+                        println("⚠️ [Reward Claim] Validation error for user ${userId ?: "unknown"}: ${e.message}")
+                        call.respondError(
+                            HttpStatusCode.BadRequest, 
+                            messageKey = MessageKeys.INVALID_REQUEST, 
+                            message = e.message ?: "Invalid request. Please check your input and try again."
+                        )
                     } catch (e: IllegalStateException) {
-                        call.respondError(HttpStatusCode.BadRequest, messageKey = MessageKeys.CANNOT_CLAIM_REWARD, message = e.message)
+                        // Business logic errors (insufficient coins, out of stock, in-progress transaction)
+                        println("⚠️ [Reward Claim] Business logic error for user ${userId ?: "unknown"}: ${e.message}")
+                        call.respondError(
+                            HttpStatusCode.BadRequest, 
+                            messageKey = e.message,
+                            message = e.message ?: "Unable to claim reward at this time."
+                        )
+                    } catch (e: io.ktor.server.plugins.BadRequestException) {
+                        // JSON parsing errors
+                        println("⚠️ [Reward Claim] Invalid JSON for user ${userId ?: "unknown"}: ${e.message}")
+                        call.respondError(
+                            HttpStatusCode.BadRequest, 
+                            messageKey = MessageKeys.INVALID_REQUEST, 
+                            message = "Invalid request format. Please check your JSON data."
+                        )
                     } catch (e: Exception) {
-                        call.respondError(HttpStatusCode.InternalServerError, messageKey = MessageKeys.CATALOG_CLAIM_FAILED, message = "Failed to claim reward: ${e.message}")
+                        // Unexpected errors (database issues, etc.)
+                        println("❌ [Reward Claim] Unexpected error for user ${userId ?: "unknown"}: ${e.message}")
+                        e.printStackTrace()
+                        call.respondError(
+                            HttpStatusCode.InternalServerError, 
+                            messageKey = MessageKeys.CATALOG_CLAIM_FAILED, 
+                            message = "An unexpected error occurred while processing your reward claim. Please try again later or contact support if the problem persists."
+                        )
                     }
                 }
                 
