@@ -16,6 +16,8 @@ import com.apptime.code.leaderboard.LeaderboardStats
 import com.apptime.code.appstats.AppStats
 import com.apptime.code.location.UserLocations
 import com.apptime.code.notifications.Notifications
+import com.apptime.code.referral.Referrals
+import com.apptime.code.referral.UserReferralCodes
 import com.apptime.code.rewards.Coins
 import com.apptime.code.rewards.RewardCatalog
 import com.apptime.code.rewards.Rewards
@@ -168,6 +170,10 @@ object DatabaseFactory {
                 Coins,
                 RewardCatalog,
                 Transactions,
+                
+                // Referral module
+                UserReferralCodes,
+                Referrals,
                 
                 // Features module
                 FeatureFlags,

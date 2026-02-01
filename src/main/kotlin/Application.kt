@@ -20,6 +20,7 @@ import com.apptime.code.notifications.NotificationRepository
 import com.apptime.code.notifications.configureNotificationRoutes
 import users.UserRepository
 import kotlinx.coroutines.CoroutineScope
+import com.apptime.code.referral.configureReferralRoutes
 import com.apptime.code.rewards.configureRewardRoutes
 import com.apptime.code.common.TranslationService
 import users.configureUserRoutes
@@ -85,6 +86,7 @@ fun Application.module() {
     configureLeaderboardRoutes()
     configureChallengeRoutes()
     configureRewardRoutes()
+    configureReferralRoutes()
     configureNotificationRoutes()
     configureFeedbackRoutes()
     configureFeatureFlagsRoutes()

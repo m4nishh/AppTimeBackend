@@ -51,10 +51,15 @@ class NotificationService(
                         data["deeplink"] = deeplink
                     }
                     
+                    if (image != null) {
+                        data["image"] = image
+                    }
+                    
                     FirebaseNotificationService.sendNotification(
                         firebaseToken = firebaseToken,
                         title = title,
                         body = text,
+                        image = image,
                         data = data
                     )
                 } else {
@@ -519,23 +524,7 @@ class NotificationService(
             deeplink = "wallpaper"
         )
     }
-    
-    /**
-     * Send welcome bonus notification
-     * Notifies new users about their welcome bonus
-     */
-    suspend fun sendWelcomeBonusNotification(
-        userId: String,
-        bonusAmount: Long
-    ) {
-        createAndSendNotification(
-            userId = userId,
-            title = "Welcome to AppTime! 🎉",
-            text = "You've received $bonusAmount welcome bonus coins! Start completing challenges to earn more.",
-            type = "welcome_bonus",
-            deeplink = "landing"
-        )
-    }
+
     
     /**
      * Send streak milestone notification
@@ -619,6 +608,41 @@ class NotificationService(
             text = "AppTime will be under maintenance on $maintenanceTime for approximately $duration. Thank you for your patience!",
             type = "maintenance",
             deeplink = "landing"
+        )
+    }
+    
+    /**
+     * Send referral success notification (to referrer)
+     * Notifies the referrer that someone used their referral code
+     */
+    suspend fun sendReferralSuccessNotification(
+        userId: String,
+        referredUsername: String,
+        coinsEarned: Long
+    ) {
+        createAndSendNotification(
+            userId = userId,
+            title = "Referral Success! 🎉",
+            text = "$referredUsername joined using your referral code! You earned $coinsEarned coins.",
+            type = "referral_success",
+            deeplink = "referrals"
+        )
+    }
+    
+    /**
+     * Send welcome bonus notification (to referred user)
+     * Notifies the new user about their welcome bonus
+     */
+    suspend fun sendWelcomeBonusNotification(
+        userId: String,
+        coinsEarned: Long
+    ) {
+        createAndSendNotification(
+            userId = userId,
+            title = "Welcome Bonus! 🎁",
+            text = "Welcome to AppTime! You've received $coinsEarned coins as a welcome bonus.",
+            type = "welcome_bonus",
+            deeplink = "rewards"
         )
     }
 }

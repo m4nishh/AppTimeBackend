@@ -244,6 +244,16 @@ object MessageKeys {
     const val NOTIFICATION_SENT = "notification.sent"
     const val NOTIFICATION_FAILED = "notification.failed"
 
+    // Referral messages
+    const val REFERRAL_CODE_RETRIEVED = "referral.code.retrieved"
+    const val REFERRAL_CODE_FAILED = "referral.code.failed"
+    const val REFERRAL_APPLY_FAILED = "referral.apply.failed"
+    const val REFERRAL_COMPLETE_FAILED = "referral.complete.failed"
+    const val REFERRAL_INFO_RETRIEVED = "referral.info.retrieved"
+    const val REFERRAL_INFO_FAILED = "referral.info.failed"
+    const val LEADERBOARD_RETRIEVED = "leaderboard.retrieved"
+    const val LEADERBOARD_FAILED = "leaderboard.failed"
+
     // Common error messages
     const val INVALID_REQUEST = "error.invalid_request"
     const val INTERNAL_SERVER_ERROR = "error.internal_server_error"

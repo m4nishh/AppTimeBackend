@@ -105,3 +105,26 @@ data class RewardBackInStockNotificationMessage(
     val coinPrice: Long
 ) : NotificationMessage()
 
+/**
+ * Message for referral success notification (to referrer)
+ */
+@Serializable
+data class ReferralSuccessNotificationMessage(
+    override val messageId: String,
+    override val timestamp: Long,
+    val userId: String,
+    val referredUsername: String,
+    val coinsEarned: Long
+) : NotificationMessage()
+
+/**
+ * Message for welcome bonus notification (to referred user)
+ */
+@Serializable
+data class WelcomeBonusNotificationMessage(
+    override val messageId: String,
+    override val timestamp: Long,
+    val userId: String,
+    val coinsEarned: Long
+) : NotificationMessage()
+

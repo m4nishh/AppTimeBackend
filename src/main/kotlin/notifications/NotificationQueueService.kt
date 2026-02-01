@@ -194,6 +194,40 @@ object NotificationQueueService {
     }
     
     /**
+     * Enqueue referral success notification (to referrer)
+     */
+    suspend fun enqueueReferralSuccessNotification(
+        userId: String,
+        referredUsername: String,
+        coinsEarned: Long
+    ) {
+        val message = ReferralSuccessNotificationMessage(
+            messageId = UUID.randomUUID().toString(),
+            timestamp = Clock.System.now().toEpochMilliseconds(),
+            userId = userId,
+            referredUsername = referredUsername,
+            coinsEarned = coinsEarned
+        )
+        enqueue(message)
+    }
+    
+    /**
+     * Enqueue welcome bonus notification (to referred user)
+     */
+    suspend fun enqueueWelcomeBonusNotification(
+        userId: String,
+        coinsEarned: Long
+    ) {
+        val message = WelcomeBonusNotificationMessage(
+            messageId = UUID.randomUUID().toString(),
+            timestamp = Clock.System.now().toEpochMilliseconds(),
+            userId = userId,
+            coinsEarned = coinsEarned
+        )
+        enqueue(message)
+    }
+    
+    /**
      * Get queue size
      */
     fun getQueueSize(): Int {
@@ -434,6 +468,47 @@ object NotificationQueueService {
                                 totalProcessed++
                             }
                             logger.info("Worker $workerId successfully processed reward back in stock notification: ${message.messageId}")
+                        }
+                        
+                        is ReferralSuccessNotificationMessage -> {
+                            logger.info("Worker $workerId processing referral success notification: ${message.messageId} for user ${message.userId}")
+                            try {
+                                notificationService.sendReferralSuccessNotification(
+                                    userId = message.userId,
+                                    referredUsername = message.referredUsername,
+                                    coinsEarned = message.coinsEarned
+                                )
+                                logger.info("Worker $workerId successfully sent referral success notification to user ${message.userId}")
+                            } catch (e: Exception) {
+                                logger.severe("Worker $workerId failed to send referral success notification: ${e.message}")
+                                logger.severe("Exception: ${e.stackTraceToString()}")
+                                throw e
+                            }
+                            mutex.withLock {
+                                queue.remove(message)
+                                totalProcessed++
+                            }
+                            logger.info("Worker $workerId successfully processed referral success notification: ${message.messageId}")
+                        }
+                        
+                        is WelcomeBonusNotificationMessage -> {
+                            logger.info("Worker $workerId processing welcome bonus notification: ${message.messageId} for user ${message.userId}")
+                            try {
+                                notificationService.sendWelcomeBonusNotification(
+                                    userId = message.userId,
+                                    coinsEarned = message.coinsEarned
+                                )
+                                logger.info("Worker $workerId successfully sent welcome bonus notification to user ${message.userId}")
+                            } catch (e: Exception) {
+                                logger.severe("Worker $workerId failed to send welcome bonus notification: ${e.message}")
+                                logger.severe("Exception: ${e.stackTraceToString()}")
+                                throw e
+                            }
+                            mutex.withLock {
+                                queue.remove(message)
+                                totalProcessed++
+                            }
+                            logger.info("Worker $workerId successfully processed welcome bonus notification: ${message.messageId}")
                         }
                     }
                 } catch (e: Exception) {
