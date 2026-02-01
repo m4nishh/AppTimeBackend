@@ -506,6 +506,7 @@ class LeaderboardRepository {
                     (LeaderboardStats.periodDate eq date)
                 }
                 .orderBy(LeaderboardStats.totalScreenTime to SortOrder.DESC)
+                .limit(20)
                 .mapIndexed { index, row ->
                     LeaderboardEntry(
                         userId = row[LeaderboardStats.userId],
@@ -548,6 +549,7 @@ class LeaderboardRepository {
                     (LeaderboardStats.periodDate eq weekDate)
                 }
                 .orderBy(LeaderboardStats.totalScreenTime to SortOrder.DESC)
+                .limit(20)
                 .mapIndexed { index, row ->
                     LeaderboardEntry(
                         userId = row[LeaderboardStats.userId],
@@ -590,6 +592,7 @@ class LeaderboardRepository {
                     (LeaderboardStats.periodDate eq monthDate)
                 }
                 .orderBy(LeaderboardStats.totalScreenTime to SortOrder.DESC)
+                .limit(20)
                 .mapIndexed { index, row ->
                     LeaderboardEntry(
                         userId = row[LeaderboardStats.userId],

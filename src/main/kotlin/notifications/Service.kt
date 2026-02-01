@@ -50,16 +50,11 @@ class NotificationService(
                     if (deeplink != null) {
                         data["deeplink"] = deeplink
                     }
-                    
-                    if (image != null) {
-                        data["image"] = image
-                    }
-                    
+
                     FirebaseNotificationService.sendNotification(
                         firebaseToken = firebaseToken,
                         title = title,
                         body = text,
-                        image = image,
                         data = data
                     )
                 } else {
