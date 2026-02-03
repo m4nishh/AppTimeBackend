@@ -2,6 +2,7 @@ package com.apptime.code.focus
 
 import com.apptime.code.leaderboard.LeaderboardRepository
 import com.apptime.code.notifications.NotificationService
+import com.apptime.code.clans.ClanService
 import kotlinx.datetime.Instant
 
 /**
@@ -10,7 +11,8 @@ import kotlinx.datetime.Instant
 class FocusService(
     private val repository: FocusRepository,
     private val leaderboardRepository: LeaderboardRepository,
-    private val notificationService: NotificationService? = null
+    private val notificationService: NotificationService? = null,
+    private val clanService: ClanService? = null
 ) {
     
     /**
@@ -103,6 +105,14 @@ class FocusService(
                 focusDuration = request.focusDuration,
                 date = date
             )
+            
+            // Update clan stats with focus time
+            try {
+                clanService?.updateClanStatsWithFocusTime(userId, request.focusDuration, date)
+            } catch (e: Exception) {
+                // Log error but don't fail the focus session submission
+                println("Failed to update clan stats: ${e.message}")
+            }
             
             // Check for focus milestones and send notifications
             checkAndNotifyFocusMilestones(userId, request.focusDuration)

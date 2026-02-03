@@ -20,7 +20,8 @@ fun Application.configureFocusRoutes() {
     val notificationRepository = com.apptime.code.notifications.NotificationRepository()
     val userRepository = users.UserRepository()
     val notificationService = com.apptime.code.notifications.NotificationService(notificationRepository, userRepository)
-    val service = FocusService(repository, leaderboardRepository, notificationService)
+    val clanService = com.apptime.code.clans.ClanService()
+    val service = FocusService(repository, leaderboardRepository, notificationService, clanService)
     
     // Focus mode stats
     val focusModeStatsRepository = FocusModeStatsRepository()
