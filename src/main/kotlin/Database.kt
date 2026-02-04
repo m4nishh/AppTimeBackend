@@ -4,6 +4,12 @@ import com.apptime.code.challenges.ChallengeParticipantStats
 import com.apptime.code.challenges.ChallengeParticipants
 import com.apptime.code.challenges.ChallengeSeedData
 import com.apptime.code.challenges.Challenges
+import com.apptime.code.clans.Clans
+import com.apptime.code.clans.ClanMembers
+import com.apptime.code.clans.ClanStats
+import com.apptime.code.clans.ClanInvites
+import com.apptime.code.clans.ClanBadges
+import com.apptime.code.clans.ClanJoinRequests
 import com.apptime.code.common.EnvLoader
 import com.apptime.code.consents.ConsentSeedData
 import com.apptime.code.consents.ConsentTemplates
@@ -174,6 +180,14 @@ object DatabaseFactory {
                 // Referral module
                 UserReferralCodes,
                 Referrals,
+                
+                // Clans module
+                Clans,
+                ClanMembers,
+                ClanStats,
+                ClanInvites,
+                ClanBadges,
+                ClanJoinRequests,
                 
                 // Features module
                 FeatureFlags,
