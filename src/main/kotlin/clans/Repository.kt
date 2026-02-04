@@ -31,15 +31,6 @@ class ClanRepository {
         category: String?
     ): Long {
         return dbTransaction {
-            // Check if creator is already in a clan
-            val existingMembership = ClanMembers.select {
-                (ClanMembers.userId eq creatorId) and (ClanMembers.isActive eq true)
-            }.firstOrNull()
-            
-            if (existingMembership != null) {
-                throw IllegalStateException("User is already a member of another clan")
-            }
-            
             // Check if clan name already exists
             val existingClan = Clans.select { Clans.name eq name }.firstOrNull()
             if (existingClan != null) {
@@ -248,13 +239,15 @@ class ClanRepository {
      */
     fun joinClan(clanId: Long, userId: String): ClanMember {
         return dbTransaction {
-            // Check if user is already in a clan
+            // Check if user is already a member of this specific clan
             val existingMembership = ClanMembers.select {
-                (ClanMembers.userId eq userId) and (ClanMembers.isActive eq true)
+                (ClanMembers.clanId eq clanId) and
+                (ClanMembers.userId eq userId) and
+                (ClanMembers.isActive eq true)
             }.firstOrNull()
             
             if (existingMembership != null) {
-                throw IllegalStateException("User is already a member of another clan")
+                throw IllegalStateException("User is already a member of this clan")
             }
             
             // Check if clan exists and has space
@@ -414,34 +407,37 @@ class ClanRepository {
         date: LocalDate
     ) {
         dbTransaction {
-            // Get user's clan membership
-            val membership = ClanMembers.select {
+            // Get all user's clan memberships
+            val memberships = ClanMembers.select {
                 (ClanMembers.userId eq userId) and (ClanMembers.isActive eq true)
-            }.firstOrNull() ?: return@dbTransaction
-            
-            val clanId = membership[ClanMembers.clanId]
-            
-            // Update member's contributed hours
-            ClanMembers.update({
-                (ClanMembers.clanId eq clanId) and (ClanMembers.userId eq userId)
-            }) {
-                it[ClanMembers.contributedFocusHours] = membership[ClanMembers.contributedFocusHours] + focusDuration
-                it[ClanMembers.lastActiveAt] = Clock.System.now()
             }
             
-            // Update clan's total focus hours
-            val clan = Clans.select { Clans.id eq clanId }.first()
-            Clans.update({ Clans.id eq clanId }) {
-                it[Clans.totalFocusHours] = clan[Clans.totalFocusHours] + focusDuration
-                it[Clans.updatedAt] = Clock.System.now()
+            // Update stats for all clans the user is a member of
+            for (membership in memberships) {
+                val clanId = membership[ClanMembers.clanId]
+                
+                // Update member's contributed hours
+                ClanMembers.update({
+                    (ClanMembers.clanId eq clanId) and (ClanMembers.userId eq userId)
+                }) {
+                    it[ClanMembers.contributedFocusHours] = membership[ClanMembers.contributedFocusHours] + focusDuration
+                    it[ClanMembers.lastActiveAt] = Clock.System.now()
+                }
+                
+                // Update clan's total focus hours
+                val clan = Clans.select { Clans.id eq clanId }.first()
+                Clans.update({ Clans.id eq clanId }) {
+                    it[Clans.totalFocusHours] = clan[Clans.totalFocusHours] + focusDuration
+                    it[Clans.updatedAt] = Clock.System.now()
+                }
+                
+                // Update daily stats
+                updateClanDailyStats(clanId, date, focusDuration)
+                
+                // Update weekly and monthly stats
+                updateClanWeeklyStats(clanId, date)
+                updateClanMonthlyStats(clanId, date)
             }
-            
-            // Update daily stats
-            updateClanDailyStats(clanId, date, focusDuration)
-            
-            // Update weekly and monthly stats
-            updateClanWeeklyStats(clanId, date)
-            updateClanMonthlyStats(clanId, date)
         }
     }
     
@@ -662,10 +658,10 @@ class ClanRepository {
                     }
                     .orderBy(ClanStats.totalFocusHours to SortOrder.DESC)
                     .mapIndexed { index, row ->
-                        Pair(row[Clans.id], index + 1)
+                        Pair(row[Clans.id].value, index + 1)
                     }
                     .toMap()
-                
+
                 allRankedClans[userClanId]
             } else {
                 null
@@ -676,7 +672,7 @@ class ClanRepository {
     }
     
     /**
-     * Get user's clan info
+     * Get user's clan info (returns first clan for backward compatibility)
      */
     fun getUserClanInfo(userId: String): Pair<Clan?, ClanMember?> {
         return dbTransaction {
@@ -703,6 +699,63 @@ class ClanRepository {
             )
             
             Pair(clan, member)
+        }
+    }
+    
+    /**
+     * Get all clans a user is a member of
+     */
+    fun getUserClans(userId: String): List<Pair<Clan, ClanMember>> {
+        return dbTransaction {
+            val memberships = ClanMembers.select {
+                (ClanMembers.userId eq userId) and (ClanMembers.isActive eq true)
+            }.map { row ->
+                val clanId = row[ClanMembers.clanId]
+                val clan = getClanById(clanId, userId) ?: return@dbTransaction emptyList()
+                
+                val member = ClanMember(
+                    clanId = row[ClanMembers.clanId],
+                    userId = row[ClanMembers.userId],
+                    username = row[ClanMembers.username],
+                    role = row[ClanMembers.role],
+                    contributedFocusHours = row[ClanMembers.contributedFocusHours],
+                    joinedAt = row[ClanMembers.joinedAt].toString(),
+                    lastActiveAt = row[ClanMembers.lastActiveAt].toString(),
+                    isActive = row[ClanMembers.isActive]
+                )
+                
+                Pair(clan, member)
+            }
+            
+            memberships
+        }
+    }
+    
+    /**
+     * Get user's membership in a specific clan
+     */
+    fun getUserClanMembership(userId: String, clanId: Long): ClanMember? {
+        return dbTransaction {
+            val membership = ClanMembers.select {
+                (ClanMembers.clanId eq clanId) and
+                (ClanMembers.userId eq userId) and
+                (ClanMembers.isActive eq true)
+            }.firstOrNull()
+            
+            if (membership == null) {
+                return@dbTransaction null
+            }
+            
+            ClanMember(
+                clanId = membership[ClanMembers.clanId],
+                userId = membership[ClanMembers.userId],
+                username = membership[ClanMembers.username],
+                role = membership[ClanMembers.role],
+                contributedFocusHours = membership[ClanMembers.contributedFocusHours],
+                joinedAt = membership[ClanMembers.joinedAt].toString(),
+                lastActiveAt = membership[ClanMembers.lastActiveAt].toString(),
+                isActive = membership[ClanMembers.isActive]
+            )
         }
     }
     
