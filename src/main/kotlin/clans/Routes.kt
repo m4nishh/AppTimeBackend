@@ -1,22 +1,13 @@
 package com.apptime.code.clans
 
+import com.apptime.code.common.respondApi
+import com.apptime.code.common.respondError
 import com.apptime.code.common.userId
 import io.ktor.http.*
 import io.ktor.server.application.*
 import io.ktor.server.auth.*
 import io.ktor.server.request.*
-import io.ktor.server.response.*
 import io.ktor.server.routing.*
-import kotlinx.serialization.Serializable
-
-@Serializable
-data class ErrorResponse(val error: String)
-
-@Serializable
-data class SuccessResponse<T>(
-    val message: String,
-    val data: T? = null
-)
 
 
 fun Application.configureClanRoutes() {
@@ -31,15 +22,15 @@ fun Application.configureClanRoutes() {
                         val userId = call.userId.toString();
                         val request = call.receive<CreateClanRequest>()
                         val clan = clanService.createClan(userId, request)
-                        call.respond(HttpStatusCode.Created, clan)
+                        call.respondApi(clan, "Clan created successfully", HttpStatusCode.Created)
                     } catch (e: IllegalArgumentException) {
-                        call.respond(HttpStatusCode.BadRequest, ErrorResponse(e.message ?: "Invalid request"))
+                        call.respondError(HttpStatusCode.BadRequest, e.message ?: "Invalid request")
                     } catch (e: IllegalStateException) {
-                        call.respond(HttpStatusCode.Conflict, ErrorResponse(e.message ?: "Conflict"))
+                        call.respondError(HttpStatusCode.Conflict, e.message ?: "Conflict")
                     } catch (e: Exception) {
-                        call.respond(
+                        call.respondError(
                             HttpStatusCode.InternalServerError,
-                            ErrorResponse(e.message ?: "Internal server error")
+                            e.message ?: "Internal server error"
                         )
                     }
                 }
@@ -73,11 +64,11 @@ fun Application.configureClanRoutes() {
                             userId = userId
                         )
 
-                        call.respond(HttpStatusCode.OK, response)
+                        call.respondApi(response, "Clans retrieved successfully")
                     } catch (e: Exception) {
-                        call.respond(
+                        call.respondError(
                             HttpStatusCode.InternalServerError,
-                            ErrorResponse(e.message ?: "Internal server error")
+                            e.message ?: "Internal server error"
                         )
                     }
                 }
@@ -97,13 +88,13 @@ fun Application.configureClanRoutes() {
                         val limit = call.request.queryParameters["limit"]?.toIntOrNull() ?: 20
 
                         val response = clanService.getClanLeaderboard(period, periodDate, limit, userId)
-                        call.respond(HttpStatusCode.OK, response)
+                        call.respondApi(response, "Clan leaderboard retrieved successfully")
                     } catch (e: IllegalArgumentException) {
-                        call.respond(HttpStatusCode.BadRequest, ErrorResponse(e.message ?: "Invalid request"))
+                        call.respondError(HttpStatusCode.BadRequest, e.message ?: "Invalid request")
                     } catch (e: Exception) {
-                        call.respond(
+                        call.respondError(
                             HttpStatusCode.InternalServerError,
-                            ErrorResponse(e.message ?: "Internal server error")
+                            e.message ?: "Internal server error"
                         )
                     }
                 }
@@ -115,11 +106,11 @@ fun Application.configureClanRoutes() {
                     try {
                         val userId = call.userId.toString()
                         val response = clanService.getUserClanInfo(userId)
-                        call.respond(HttpStatusCode.OK, response)
+                        call.respondApi(response, "User clan info retrieved successfully")
                     } catch (e: Exception) {
-                        call.respond(
+                        call.respondError(
                             HttpStatusCode.InternalServerError,
-                            ErrorResponse(e.message ?: "Internal server error")
+                            e.message ?: "Internal server error"
                         )
                     }
                 }
@@ -134,16 +125,16 @@ fun Application.configureClanRoutes() {
                                 null
                             }
                             val clanId = call.parameters["clanId"]?.toLongOrNull()
-                                ?: return@get call.respond(HttpStatusCode.BadRequest, ErrorResponse("Invalid clan ID"))
+                                ?: return@get call.respondError(HttpStatusCode.BadRequest, "Invalid clan ID")
 
                             val response = clanService.getClanDetails(clanId, userId)
-                            call.respond(HttpStatusCode.OK, response)
+                            call.respondApi(response, "Clan details retrieved successfully")
                         } catch (e: IllegalStateException) {
-                            call.respond(HttpStatusCode.NotFound, ErrorResponse(e.message ?: "Clan not found"))
+                            call.respondError(HttpStatusCode.NotFound, e.message ?: "Clan not found")
                         } catch (e: Exception) {
-                            call.respond(
+                            call.respondError(
                                 HttpStatusCode.InternalServerError,
-                                ErrorResponse(e.message ?: "Internal server error")
+                                e.message ?: "Internal server error"
                             )
                         }
                     }
@@ -155,22 +146,19 @@ fun Application.configureClanRoutes() {
                         try {
                             val userId = call.userId.toString()
                             val clanId = call.parameters["clanId"]?.toLongOrNull()
-                                ?: return@patch call.respond(
-                                    HttpStatusCode.BadRequest,
-                                    ErrorResponse("Invalid clan ID")
-                                )
+                                ?: return@patch call.respondError(HttpStatusCode.BadRequest, "Invalid clan ID")
                             val request = call.receive<UpdateClanRequest>()
 
                             val clan = clanService.updateClan(clanId, userId, request)
-                            call.respond(HttpStatusCode.OK, clan)
+                            call.respondApi(clan, "Clan updated successfully")
                         } catch (e: IllegalArgumentException) {
-                            call.respond(HttpStatusCode.BadRequest, ErrorResponse(e.message ?: "Invalid request"))
+                            call.respondError(HttpStatusCode.BadRequest, e.message ?: "Invalid request")
                         } catch (e: IllegalStateException) {
-                            call.respond(HttpStatusCode.Forbidden, ErrorResponse(e.message ?: "Forbidden"))
+                            call.respondError(HttpStatusCode.Forbidden, e.message ?: "Forbidden")
                         } catch (e: Exception) {
-                            call.respond(
+                            call.respondError(
                                 HttpStatusCode.InternalServerError,
-                                ErrorResponse(e.message ?: "Internal server error")
+                                e.message ?: "Internal server error"
                             )
                         }
                     }
@@ -183,19 +171,16 @@ fun Application.configureClanRoutes() {
                         try {
                             val userId = call.userId.toString()
                             val clanId = call.parameters["clanId"]?.toLongOrNull()
-                                ?: return@delete call.respond(
-                                    HttpStatusCode.BadRequest,
-                                    ErrorResponse("Invalid clan ID")
-                                )
+                                ?: return@delete call.respondError(HttpStatusCode.BadRequest, "Invalid clan ID")
 
                             clanService.deleteClan(clanId, userId)
-                            call.respond(HttpStatusCode.OK, SuccessResponse<Unit>("Clan deleted successfully"))
+                            call.respondApi("", "Clan deleted successfully")
                         } catch (e: IllegalStateException) {
-                            call.respond(HttpStatusCode.Forbidden, ErrorResponse(e.message ?: "Forbidden"))
+                            call.respondError(HttpStatusCode.Forbidden, e.message ?: "Forbidden")
                         } catch (e: Exception) {
-                            call.respond(
+                            call.respondError(
                                 HttpStatusCode.InternalServerError,
-                                ErrorResponse(e.message ?: "Internal server error")
+                                e.message ?: "Internal server error"
                             )
                         }
                     }
@@ -209,15 +194,15 @@ fun Application.configureClanRoutes() {
                             val userId = call.userId.toString()
                             val request = call.receive<JoinClanRequest>()
                             val member = clanService.joinClan(userId, request)
-                            call.respond(HttpStatusCode.OK, member)
+                            call.respondApi(member, "Joined clan successfully")
                         } catch (e: IllegalArgumentException) {
-                            call.respond(HttpStatusCode.BadRequest, ErrorResponse(e.message ?: "Invalid request"))
+                            call.respondError(HttpStatusCode.BadRequest, e.message ?: "Invalid request")
                         } catch (e: IllegalStateException) {
-                            call.respond(HttpStatusCode.Conflict, ErrorResponse(e.message ?: "Conflict"))
+                            call.respondError(HttpStatusCode.Conflict, e.message ?: "Conflict")
                         } catch (e: Exception) {
-                            call.respond(
+                            call.respondError(
                                 HttpStatusCode.InternalServerError,
-                                ErrorResponse(e.message ?: "Internal server error")
+                                e.message ?: "Internal server error"
                             )
                         }
                     }
@@ -229,16 +214,16 @@ fun Application.configureClanRoutes() {
                         try {
                             val userId = call.userId.toString()
                             val clanId = call.parameters["clanId"]?.toLongOrNull()
-                                ?: return@post call.respond(HttpStatusCode.BadRequest, ErrorResponse("Invalid clan ID"))
+                                ?: return@post call.respondError(HttpStatusCode.BadRequest, "Invalid clan ID")
 
                             clanService.leaveClan(userId, clanId)
-                            call.respond(HttpStatusCode.OK, SuccessResponse<Unit>("Left clan successfully"))
+                            call.respondApi("", "Left clan successfully")
                         } catch (e: IllegalStateException) {
-                            call.respond(HttpStatusCode.Conflict, ErrorResponse(e.message ?: "Conflict"))
+                            call.respondError(HttpStatusCode.Conflict, e.message ?: "Conflict")
                         } catch (e: Exception) {
-                            call.respond(
+                            call.respondError(
                                 HttpStatusCode.InternalServerError,
-                                ErrorResponse(e.message ?: "Internal server error")
+                                e.message ?: "Internal server error"
                             )
                         }
                     }
@@ -249,14 +234,14 @@ fun Application.configureClanRoutes() {
                     get("/{clanId}/members") {
                         try {
                             val clanId = call.parameters["clanId"]?.toLongOrNull()
-                                ?: return@get call.respond(HttpStatusCode.BadRequest, ErrorResponse("Invalid clan ID"))
+                                ?: return@get call.respondError(HttpStatusCode.BadRequest, "Invalid clan ID")
 
                             val members = clanService.getClanDetails(clanId, null).members
-                            call.respond(HttpStatusCode.OK, members)
+                            call.respondApi(members, "Clan members retrieved successfully")
                         } catch (e: Exception) {
-                            call.respond(
+                            call.respondError(
                                 HttpStatusCode.InternalServerError,
-                                ErrorResponse(e.message ?: "Internal server error")
+                                e.message ?: "Internal server error"
                             )
                         }
                     }
@@ -268,22 +253,19 @@ fun Application.configureClanRoutes() {
                         try {
                             val userId = call.userId.toString()
                             val clanId = call.parameters["clanId"]?.toLongOrNull()
-                                ?: return@patch call.respond(
-                                    HttpStatusCode.BadRequest,
-                                    ErrorResponse("Invalid clan ID")
-                                )
+                                ?: return@patch call.respondError(HttpStatusCode.BadRequest, "Invalid clan ID")
                             val request = call.receive<UpdateMemberRoleRequest>()
 
                             clanService.updateMemberRole(clanId, userId, request)
-                            call.respond(HttpStatusCode.OK, SuccessResponse<Unit>("Member role updated successfully"))
+                            call.respondApi("", "Member role updated successfully")
                         } catch (e: IllegalArgumentException) {
-                            call.respond(HttpStatusCode.BadRequest, ErrorResponse(e.message ?: "Invalid request"))
+                            call.respondError(HttpStatusCode.BadRequest, e.message ?: "Invalid request")
                         } catch (e: IllegalStateException) {
-                            call.respond(HttpStatusCode.Forbidden, ErrorResponse(e.message ?: "Forbidden"))
+                            call.respondError(HttpStatusCode.Forbidden, e.message ?: "Forbidden")
                         } catch (e: Exception) {
-                            call.respond(
+                            call.respondError(
                                 HttpStatusCode.InternalServerError,
-                                ErrorResponse(e.message ?: "Internal server error")
+                                e.message ?: "Internal server error"
                             )
                         }
                     }
@@ -295,17 +277,17 @@ fun Application.configureClanRoutes() {
                         try {
                             val userId = call.userId.toString()
                             val clanId = call.parameters["clanId"]?.toLongOrNull()
-                                ?: return@post call.respond(HttpStatusCode.BadRequest, ErrorResponse("Invalid clan ID"))
+                                ?: return@post call.respondError(HttpStatusCode.BadRequest, "Invalid clan ID")
                             val request = call.receive<RemoveMemberRequest>()
 
                             clanService.removeMember(clanId, userId, request)
-                            call.respond(HttpStatusCode.OK, SuccessResponse<Unit>("Member removed successfully"))
+                            call.respondApi("", "Member removed successfully")
                         } catch (e: IllegalStateException) {
-                            call.respond(HttpStatusCode.Forbidden, ErrorResponse(e.message ?: "Forbidden"))
+                            call.respondError(HttpStatusCode.Forbidden, e.message ?: "Forbidden")
                         } catch (e: Exception) {
-                            call.respond(
+                            call.respondError(
                                 HttpStatusCode.InternalServerError,
-                                ErrorResponse(e.message ?: "Internal server error")
+                                e.message ?: "Internal server error"
                             )
                         }
                     }
@@ -317,17 +299,17 @@ fun Application.configureClanRoutes() {
                         try {
                             val userId = call.userId.toString()
                             val clanId = call.parameters["clanId"]?.toLongOrNull()
-                                ?: return@post call.respond(HttpStatusCode.BadRequest, ErrorResponse("Invalid clan ID"))
+                                ?: return@post call.respondError(HttpStatusCode.BadRequest, "Invalid clan ID")
                             val request = call.receive<CreateInviteRequest>()
 
                             val invite = clanService.createInvite(clanId, userId, request)
-                            call.respond(HttpStatusCode.Created, invite)
+                            call.respondApi(invite, "Invite created successfully", HttpStatusCode.Created)
                         } catch (e: IllegalStateException) {
-                            call.respond(HttpStatusCode.Forbidden, ErrorResponse(e.message ?: "Forbidden"))
+                            call.respondError(HttpStatusCode.Forbidden, e.message ?: "Forbidden")
                         } catch (e: Exception) {
-                            call.respond(
+                            call.respondError(
                                 HttpStatusCode.InternalServerError,
-                                ErrorResponse(e.message ?: "Internal server error")
+                                e.message ?: "Internal server error"
                             )
                         }
                     }
@@ -340,16 +322,16 @@ fun Application.configureClanRoutes() {
                             val userId = call.userId.toString()
                             val request = call.receive<AcceptInviteRequest>()
                             val member = clanService.acceptInvite(userId, request.inviteCode)
-                            call.respond(HttpStatusCode.OK, member)
+                            call.respondApi(member, "Invite accepted successfully")
                         } catch (e: IllegalStateException) {
-                            call.respond(
+                            call.respondError(
                                 HttpStatusCode.BadRequest,
-                                ErrorResponse(e.message ?: "Invalid or expired invite")
+                                e.message ?: "Invalid or expired invite"
                             )
                         } catch (e: Exception) {
-                            call.respond(
+                            call.respondError(
                                 HttpStatusCode.InternalServerError,
-                                ErrorResponse(e.message ?: "Internal server error")
+                                e.message ?: "Internal server error"
                             )
                         }
                     }
@@ -361,16 +343,16 @@ fun Application.configureClanRoutes() {
                         try {
                             val userId = call.userId.toString()
                             val clanId = call.parameters["clanId"]?.toLongOrNull()
-                                ?: return@get call.respond(HttpStatusCode.BadRequest, ErrorResponse("Invalid clan ID"))
+                                ?: return@get call.respondError(HttpStatusCode.BadRequest, "Invalid clan ID")
 
                             val requests = clanService.getPendingJoinRequests(clanId, userId)
-                            call.respond(HttpStatusCode.OK, requests)
+                            call.respondApi(requests, "Join requests retrieved successfully")
                         } catch (e: IllegalStateException) {
-                            call.respond(HttpStatusCode.Forbidden, ErrorResponse(e.message ?: "Forbidden"))
+                            call.respondError(HttpStatusCode.Forbidden, e.message ?: "Forbidden")
                         } catch (e: Exception) {
-                            call.respond(
+                            call.respondError(
                                 HttpStatusCode.InternalServerError,
-                                ErrorResponse(e.message ?: "Internal server error")
+                                e.message ?: "Internal server error"
                             )
                         }
                     }
@@ -382,26 +364,23 @@ fun Application.configureClanRoutes() {
                         try {
                             val userId = call.userId.toString()
                             val clanId = call.parameters["clanId"]?.toLongOrNull()
-                                ?: return@post call.respond(HttpStatusCode.BadRequest, ErrorResponse("Invalid clan ID"))
+                                ?: return@post call.respondError(HttpStatusCode.BadRequest, "Invalid clan ID")
                             val requestId = call.parameters["requestId"]?.toLongOrNull()
-                                ?: return@post call.respond(
-                                    HttpStatusCode.BadRequest,
-                                    ErrorResponse("Invalid request ID")
-                                )
+                                ?: return@post call.respondError(HttpStatusCode.BadRequest, "Invalid request ID")
                             val request = call.receive<ReviewJoinRequestRequest>()
 
                             val member = clanService.reviewJoinRequest(clanId, requestId, userId, request)
                             if (member != null) {
-                                call.respond(HttpStatusCode.OK, SuccessResponse("Join request approved", member))
+                                call.respondApi(member, "Join request approved")
                             } else {
-                                call.respond(HttpStatusCode.OK, SuccessResponse<Unit>("Join request rejected"))
+                                call.respondApi("", "Join request rejected")
                             }
                         } catch (e: IllegalStateException) {
-                            call.respond(HttpStatusCode.Forbidden, ErrorResponse(e.message ?: "Forbidden"))
+                            call.respondError(HttpStatusCode.Forbidden, e.message ?: "Forbidden")
                         } catch (e: Exception) {
-                            call.respond(
+                            call.respondError(
                                 HttpStatusCode.InternalServerError,
-                                ErrorResponse(e.message ?: "Internal server error")
+                                e.message ?: "Internal server error"
                             )
                         }
                     }
@@ -412,14 +391,14 @@ fun Application.configureClanRoutes() {
                     get("/{clanId}/badges") {
                         try {
                             val clanId = call.parameters["clanId"]?.toLongOrNull()
-                                ?: return@get call.respond(HttpStatusCode.BadRequest, ErrorResponse("Invalid clan ID"))
+                                ?: return@get call.respondError(HttpStatusCode.BadRequest, "Invalid clan ID")
 
                             val badges = clanService.getClanDetails(clanId, null).badges
-                            call.respond(HttpStatusCode.OK, badges)
+                            call.respondApi(badges, "Clan badges retrieved successfully")
                         } catch (e: Exception) {
-                            call.respond(
+                            call.respondError(
                                 HttpStatusCode.InternalServerError,
-                                ErrorResponse(e.message ?: "Internal server error")
+                                e.message ?: "Internal server error"
                             )
                         }
                     }
@@ -430,16 +409,16 @@ fun Application.configureClanRoutes() {
                     get("/{clanId}/stats") {
                         try {
                             val clanId = call.parameters["clanId"]?.toLongOrNull()
-                                ?: return@get call.respond(HttpStatusCode.BadRequest, ErrorResponse("Invalid clan ID"))
+                                ?: return@get call.respondError(HttpStatusCode.BadRequest, "Invalid clan ID")
 
                             val stats = clanService.getClanStats(clanId)
-                            call.respond(HttpStatusCode.OK, stats)
+                            call.respondApi(stats, "Clan stats retrieved successfully")
                         } catch (e: IllegalStateException) {
-                            call.respond(HttpStatusCode.NotFound, ErrorResponse(e.message ?: "Clan not found"))
+                            call.respondError(HttpStatusCode.NotFound, e.message ?: "Clan not found")
                         } catch (e: Exception) {
-                            call.respond(
+                            call.respondError(
                                 HttpStatusCode.InternalServerError,
-                                ErrorResponse(e.message ?: "Internal server error")
+                                e.message ?: "Internal server error"
                             )
                         }
                     }

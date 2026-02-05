@@ -54,10 +54,12 @@ object ClanMembers : LongIdTable("clan_members") {
         .clientDefault { kotlinx.datetime.Clock.System.now() }
     val isActive = bool("is_active").default(true)
     init {
-        // One user can only be active in one clan at a time
-        uniqueIndex(userId, isActive)
+        // Users can be members of multiple clans
+        // Add unique constraint to prevent duplicate memberships in the same clan
+        uniqueIndex(clanId, userId)
 
         index(false, clanId, isActive)
+        index(false, userId, isActive)
     }
 }
 

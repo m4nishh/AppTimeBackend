@@ -30,7 +30,7 @@ data class ApiError(
  */
 object ResponseHelper {
     fun <T> success(data: T, message: String? = null): ApiResponse<T> {
-        return ApiResponse(success = true, status = 200, data = data, message = message)
+        return ApiResponse(success = true, status = 200, data = data, message = message, error = null)
     }
     
     fun <T> error(status: Int, message: String, code: String? = null): ApiResponse<T> {

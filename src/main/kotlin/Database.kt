@@ -10,6 +10,13 @@ import com.apptime.code.clans.ClanStats
 import com.apptime.code.clans.ClanInvites
 import com.apptime.code.clans.ClanBadges
 import com.apptime.code.clans.ClanJoinRequests
+import com.apptime.code.clans.UserAppCategories
+import com.apptime.code.clans.AppCategoryUsage
+import com.apptime.code.clans.ClanVault
+import com.apptime.code.clans.ClanChallenges
+import com.apptime.code.clans.ClanChallengeParticipants
+import com.apptime.code.clans.ClanWars
+import com.apptime.code.clans.ClanEducationLeaderboard
 import com.apptime.code.common.EnvLoader
 import com.apptime.code.consents.ConsentSeedData
 import com.apptime.code.consents.ConsentTemplates
@@ -100,6 +107,9 @@ object DatabaseFactory {
                 }
             )
 
+            // Run migrations
+            runMigrations()
+            
             // Create all tables
             createTables()
             
@@ -129,6 +139,88 @@ object DatabaseFactory {
             
             // Re-throw to prevent application from starting with broken database
             throw RuntimeException("Failed to connect to database. See error details above.", e)
+        }
+    }
+
+    private fun runMigrations() {
+        transaction {
+            try {
+                // Migration: Remove old unique constraint on (user_id, is_active) 
+                // to allow users to be members of multiple clans
+                val migrationSQL = """
+                    DO $$ 
+                    DECLARE
+                        constraint_name TEXT;
+                    BEGIN
+                        -- Find and drop old constraint on (user_id, is_active)
+                        SELECT conname INTO constraint_name
+                        FROM pg_constraint c
+                        JOIN pg_class t ON c.conrelid = t.oid
+                        JOIN pg_namespace n ON t.relnamespace = n.oid
+                        WHERE n.nspname = 'public'
+                          AND t.relname = 'clan_members'
+                          AND c.contype = 'u'
+                          AND array_length(c.conkey, 1) = 2
+                          AND EXISTS (
+                              SELECT 1 FROM pg_attribute a1
+                              WHERE a1.attrelid = c.conrelid
+                                AND a1.attnum = c.conkey[1]
+                                AND a1.attname = 'user_id'
+                          )
+                          AND EXISTS (
+                              SELECT 1 FROM pg_attribute a2
+                              WHERE a2.attrelid = c.conrelid
+                                AND a2.attnum = c.conkey[2]
+                                AND a2.attname = 'is_active'
+                          );
+                        
+                        IF constraint_name IS NOT NULL THEN
+                            EXECUTE format('ALTER TABLE clan_members DROP CONSTRAINT %I', constraint_name);
+                            RAISE NOTICE 'Dropped old constraint: %', constraint_name;
+                        END IF;
+                        
+                        -- Ensure new constraint exists on (clan_id, user_id)
+                        SELECT conname INTO constraint_name
+                        FROM pg_constraint c
+                        JOIN pg_class t ON c.conrelid = t.oid
+                        JOIN pg_namespace n ON t.relnamespace = n.oid
+                        WHERE n.nspname = 'public'
+                          AND t.relname = 'clan_members'
+                          AND c.contype = 'u'
+                          AND array_length(c.conkey, 1) = 2
+                          AND EXISTS (
+                              SELECT 1 FROM pg_attribute a1
+                              WHERE a1.attrelid = c.conrelid
+                                AND a1.attnum = c.conkey[1]
+                                AND a1.attname = 'clan_id'
+                          )
+                          AND EXISTS (
+                              SELECT 1 FROM pg_attribute a2
+                              WHERE a2.attrelid = c.conrelid
+                                AND a2.attnum = c.conkey[2]
+                                AND a2.attname = 'user_id'
+                          );
+                        
+                        IF constraint_name IS NULL THEN
+                            ALTER TABLE clan_members 
+                            ADD CONSTRAINT clan_members_clan_id_user_id_unique 
+                            UNIQUE (clan_id, user_id);
+                            RAISE NOTICE 'Added new constraint: clan_members_clan_id_user_id_unique';
+                        END IF;
+                    END $$;
+                """.trimIndent()
+                
+                // Execute the migration SQL using the connection
+                transaction {
+                    exec(migrationSQL)
+                }
+
+
+                println("✅ Database migrations completed!")
+            } catch (e: Exception) {
+                // Migration might fail if constraint doesn't exist or already exists, which is fine
+                println("⚠️  Migration note: ${e.message}")
+            }
         }
     }
 
@@ -188,6 +280,15 @@ object DatabaseFactory {
                 ClanInvites,
                 ClanBadges,
                 ClanJoinRequests,
+                
+                // Behavioral OS module
+                UserAppCategories,
+                AppCategoryUsage,
+                ClanVault,
+                ClanChallenges,
+                ClanChallengeParticipants,
+                ClanWars,
+                ClanEducationLeaderboard,
                 
                 // Features module
                 FeatureFlags,

@@ -53,12 +53,11 @@ class ClanService {
      * Update clan details (admin only)
      */
     fun updateClan(clanId: Long, userId: String, request: UpdateClanRequest): Clan {
-        // Check if user is admin
-        val (clan, member) = repository.getUserClanInfo(userId)
-//        if (clan?.id != clanId) {
-//            throw IllegalStateException("User is not a member of this clan")
-//        }
-        if (member?.role !in listOf("ADMIN", "MODERATOR")) {
+        // Check if user is admin or moderator of this specific clan
+        val member = repository.getUserClanMembership(userId, clanId)
+            ?: throw IllegalStateException("User is not a member of this clan")
+        
+        if (member.role !in listOf("ADMIN", "MODERATOR")) {
             throw IllegalStateException("User does not have permission to update clan")
         }
         
@@ -246,12 +245,11 @@ class ClanService {
      * Update member role (admin/moderator only)
      */
     fun updateMemberRole(clanId: Long, adminUserId: String, request: UpdateMemberRoleRequest) {
-        // Check if user is admin
-        val (clan, member) = repository.getUserClanInfo(adminUserId)
-//        if (clan?.id != clanId) {
-//            throw IllegalStateException("User is not a member of this clan")
-//        }
-        if (member?.role != "ADMIN") {
+        // Check if user is admin of this specific clan
+        val member = repository.getUserClanMembership(adminUserId, clanId)
+            ?: throw IllegalStateException("User is not a member of this clan")
+        
+        if (member.role != "ADMIN") {
             throw IllegalStateException("User does not have permission to update member roles")
         }
         
@@ -276,12 +274,11 @@ class ClanService {
      * Remove member from clan (admin/moderator only)
      */
     fun removeMember(clanId: Long, adminUserId: String, request: RemoveMemberRequest) {
-        // Check if user is admin or moderator
-        val (clan, member) = repository.getUserClanInfo(adminUserId)
-//        if (clan?.id != clanId) {
-//            throw IllegalStateException("User is not a member of this clan")
-//        }
-        if (member?.role !in listOf("ADMIN", "MODERATOR")) {
+        // Check if user is admin or moderator of this specific clan
+        val member = repository.getUserClanMembership(adminUserId, clanId)
+            ?: throw IllegalStateException("User is not a member of this clan")
+        
+        if (member.role !in listOf("ADMIN", "MODERATOR")) {
             throw IllegalStateException("User does not have permission to remove members")
         }
         
@@ -302,12 +299,11 @@ class ClanService {
      * Create clan invite
      */
     fun createInvite(clanId: Long, userId: String, request: CreateInviteRequest): ClanInvite {
-        // Check if user is admin or moderator
-        val (clan, member) = repository.getUserClanInfo(userId)
-//        if (clan?.id != clanId) {
-//            throw IllegalStateException("User is not a member of this clan")
-//        }
-        if (member?.role !in listOf("ADMIN", "MODERATOR")) {
+        // Check if user is admin or moderator of this specific clan
+        val member = repository.getUserClanMembership(userId, clanId)
+            ?: throw IllegalStateException("User is not a member of this clan")
+        
+        if (member.role !in listOf("ADMIN", "MODERATOR")) {
             throw IllegalStateException("User does not have permission to create invites")
         }
         
@@ -338,12 +334,11 @@ class ClanService {
      * Get pending join requests for a clan (admin/moderator only)
      */
     fun getPendingJoinRequests(clanId: Long, userId: String): List<ClanJoinRequest> {
-        // Check if user is admin or moderator
-        val (clan, member) = repository.getUserClanInfo(userId)
-//        if (clan?.id != clanId) {
-//            throw IllegalStateException("User is not a member of this clan")
-//        }
-        if (member?.role !in listOf("ADMIN", "MODERATOR")) {
+        // Check if user is admin or moderator of this specific clan
+        val member = repository.getUserClanMembership(userId, clanId)
+            ?: throw IllegalStateException("User is not a member of this clan")
+        
+        if (member.role !in listOf("ADMIN", "MODERATOR")) {
             throw IllegalStateException("User does not have permission to view join requests")
         }
         
@@ -359,12 +354,11 @@ class ClanService {
         userId: String,
         request: ReviewJoinRequestRequest
     ): ClanMember? {
-        // Check if user is admin or moderator
-        val (clan, member) = repository.getUserClanInfo(userId)
-//        if (clan?.id != clanId) {
-//            throw IllegalStateException("User is not a member of this clan")
-//        }
-        if (member?.role !in listOf("ADMIN", "MODERATOR")) {
+        // Check if user is admin or moderator of this specific clan
+        val member = repository.getUserClanMembership(userId, clanId)
+            ?: throw IllegalStateException("User is not a member of this clan")
+        
+        if (member.role !in listOf("ADMIN", "MODERATOR")) {
             throw IllegalStateException("User does not have permission to review join requests")
         }
         
@@ -463,31 +457,33 @@ class ClanService {
      * Check and award badges to clans based on achievements
      */
     private fun checkAndAwardBadges(userId: String) {
-        val (clan, _) = repository.getUserClanInfo(userId)
-        if (clan == null) return
+        // Check badges for all clans the user is a member of
+        val userClans = repository.getUserClans(userId)
         
-        // Check for total focus hours milestones
-        val milestones = listOf(
-            Pair(100L * 3600 * 1000, "MILESTONE_100H"),  // 100 hours
-            Pair(500L * 3600 * 1000, "MILESTONE_500H"),  // 500 hours
-            Pair(1000L * 3600 * 1000, "MILESTONE_1000H"), // 1000 hours
-            Pair(5000L * 3600 * 1000, "MILESTONE_5000H")  // 5000 hours
-        )
-        
-        for ((threshold, badgeType) in milestones) {
-            if (clan.totalFocusHours >= threshold) {
-                // Check if badge already exists
-//                val badges = repository.getClanBadges(clan.id)
-//                if (badges.none { it.badgeType == badgeType }) {
-//                    repository.addClanBadge(
-//                        clanId = clan.id,
-//                        badgeType = badgeType,
-//                        title = "${threshold / (3600 * 1000)} Hour Milestone",
-//                        description = "Achieved ${threshold / (3600 * 1000)} total focus hours",
-//                        iconUrl = null,
-//                        metadata = """{"totalHours": ${threshold / (3600 * 1000)}}"""
-//                    )
-//                }
+        for ((clan, _) in userClans) {
+            // Check for total focus hours milestones
+            val milestones = listOf(
+                Pair(100L * 3600 * 1000, "MILESTONE_100H"),  // 100 hours
+                Pair(500L * 3600 * 1000, "MILESTONE_500H"),  // 500 hours
+                Pair(1000L * 3600 * 1000, "MILESTONE_1000H"), // 1000 hours
+                Pair(5000L * 3600 * 1000, "MILESTONE_5000H")  // 5000 hours
+            )
+            
+            for ((threshold, badgeType) in milestones) {
+                if (clan.totalFocusHours >= threshold) {
+                    // Check if badge already exists
+//                    val badges = repository.getClanBadges(clan.id)
+//                    if (badges.none { it.badgeType == badgeType }) {
+//                        repository.addClanBadge(
+//                            clanId = clan.id,
+//                            badgeType = badgeType,
+//                            title = "${threshold / (3600 * 1000)} Hour Milestone",
+//                            description = "Achieved ${threshold / (3600 * 1000)} total focus hours",
+//                            iconUrl = null,
+//                            metadata = """{"totalHours": ${threshold / (3600 * 1000)}}"""
+//                        )
+//                    }
+                }
             }
         }
     }

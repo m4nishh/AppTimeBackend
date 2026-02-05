@@ -4,6 +4,7 @@ import DatabaseFactory
 import com.apptime.code.admin.configureAdminRoutes
 import com.apptime.code.challenges.configureChallengeRoutes
 import com.apptime.code.clans.configureClanRoutes
+import com.apptime.code.clans.configureBehavioralOSRoutes
 import com.apptime.code.common.configureAuthentication
 import com.apptime.code.common.configureHeaderTracking
 import com.apptime.code.common.configureApiSecretKey
@@ -89,6 +90,7 @@ fun Application.module() {
     configureRewardRoutes()
     configureReferralRoutes()
     configureClanRoutes()
+    configureBehavioralOSRoutes()
     configureNotificationRoutes()
     configureFeedbackRoutes()
     configureFeatureFlagsRoutes()
