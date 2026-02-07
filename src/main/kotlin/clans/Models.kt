@@ -38,6 +38,7 @@ enum class InviteStatus {
  */
 @Serializable
 data class Clan(
+    val id: Long,
     val name: String,
     val description: String? = null,
     val tagline: String? = null,
@@ -220,7 +221,8 @@ data class ClanDetailsResponse(
     val clan: Clan,
     val members: List<ClanMember>,
     val stats: ClanStatsResponse,
-    val badges: List<ClanBadge>
+    val badges: List<ClanBadge>,
+    val appUsageAnalytics: ClanAppUsageAnalyticsResponse? = null // App usage analytics for all members
 )
 
 /**
@@ -331,5 +333,86 @@ data class ClanActivity(
     val userId: String? = null,
     val metadata: String? = null,
     val timestamp: String // ISO 8601
+)
+
+/**
+ * Clan share link response
+ */
+@Serializable
+data class ClanShareLinkResponse(
+    val clanId: Long,
+    val shareLink: String,
+    val deeplink: String, // App deeplink format: apptime://screen/clan_detail/{token}
+    val shareCode: String // Unique code for tracking this share
+)
+
+/**
+ * Request to track share event (join, app_open)
+ */
+@Serializable
+data class TrackClanShareEventRequest(
+    val shareCode: String? = null, // Optional: can use token instead
+    val token: String? = null, // Optional: encoded token containing clanId and shareCode
+    val eventType: String, // JOIN, APP_OPEN
+    val deviceId: String? = null
+)
+
+/**
+ * Response for share statistics
+ */
+@Serializable
+data class ClanShareStatsResponse(
+    val totalShares: Long,
+    val totalClicks: Int,
+    val totalJoins: Int
+)
+
+/**
+ * Clan app usage analytics response
+ */
+@Serializable
+data class ClanAppUsageAnalyticsResponse(
+    val period: String, // "daily", "weekly", "monthly"
+    val periodDate: String,
+    val totalScreenTime: Long, // Total screen time of all members in milliseconds
+    val categoryBreakdown: List<CategoryUsage>, // Category-wise breakdown
+    val topApps: List<TopAppUsage>, // Top apps used by clan members
+    val memberActivity: List<MemberActivityStats> // Activity stats per member
+)
+
+/**
+ * Category usage breakdown
+ */
+@Serializable
+data class CategoryUsage(
+    val category: String?,
+    val totalTime: Long, // in milliseconds
+    val percentage: Double, // Percentage of total screen time
+    val memberCount: Int // Number of members who used apps in this category
+)
+
+/**
+ * Top app usage
+ */
+@Serializable
+data class TopAppUsage(
+    val packageName: String,
+    val appName: String?,
+    val totalTime: Long, // in milliseconds
+    val userCount: Int, // Number of users who used this app
+    val averageTime: Long // Average time per user in milliseconds
+)
+
+/**
+ * Member activity stats
+ */
+@Serializable
+data class MemberActivityStats(
+    val userId: String,
+    val username: String?,
+    val totalScreenTime: Long, // in milliseconds
+    val appCount: Int, // Number of unique apps used
+    val categoryCount: Int, // Number of unique categories
+    val rank: Int // Rank based on screen time
 )
 

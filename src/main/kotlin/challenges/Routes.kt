@@ -10,8 +10,10 @@ import com.apptime.code.rewards.RewardService
 import io.ktor.http.*
 import io.ktor.server.application.*
 import io.ktor.server.auth.*
+import io.ktor.server.plugins.*
 import io.ktor.server.request.*
 import io.ktor.server.routing.*
+import java.net.URLEncoder
 
 /**
  * Configure challenge-related routes
@@ -223,6 +225,128 @@ fun Application.configureChallengeRoutes() {
                         call.respondError(HttpStatusCode.BadRequest, messageKey = MessageKeys.INVALID_REQUEST, message = e.message)
                     } catch (e: Exception) {
                         call.respondError(HttpStatusCode.InternalServerError, messageKey = MessageKeys.CHALLENGE_LAST_SYNC_FAILED, message = "Failed to retrieve last sync time: ${e.message}")
+                    }
+                }
+                
+                /**
+                 * GET /api/challenges/{challengeId}/share
+                 * Get shareable link for a challenge (requires authentication)
+                 * Path parameter: challengeId
+                 * Returns: Share link and deeplink for the challenge with tracking code
+                 */
+                get("/{challengeId}/share") {
+                    try {
+                        val userId = call.requireUserId()
+                        val challengeId = call.parameters["challengeId"]?.toLongOrNull()
+                            ?: throw IllegalArgumentException("Invalid challenge ID")
+                        
+                        // Validate challenge exists
+                        repository.getChallengeById(challengeId)
+                            ?: throw IllegalArgumentException("Challenge not found")
+                        
+                        // Create or get share record
+                        val shareCode = repository.createOrGetChallengeShare(challengeId, userId)
+                        
+                        // Get base URL from request
+                        val scheme = call.request.origin.scheme
+                        val host = call.request.host()
+                        val port = call.request.port()
+                        val baseUrl = if (port == 80 || port == 443) {
+                            "$scheme://$host"
+                        } else {
+                            "$scheme://$host:$port"
+                        }
+                        
+                        // Encode challenge ID and share code into a secure token
+                        val token = com.apptime.code.common.TokenEncoder.encodeChallengeShare(challengeId, shareCode)
+                        val encodedToken = URLEncoder.encode(token, "UTF-8")
+                        
+                        // Use token instead of revealing challenge ID and share code
+                        val shareLink = "$baseUrl/challenge/$encodedToken"
+                        val deeplink = "apptime://screen/challenge_detail/$encodedToken"
+                        
+                        val response = ChallengeShareLinkResponse(
+                            challengeId = challengeId,
+                            shareLink = shareLink,
+                            deeplink = deeplink,
+                            shareCode = shareCode
+                        )
+                        
+                        call.respondApi(response, messageKey = MessageKeys.CHALLENGE_DETAILS_RETRIEVED)
+                    } catch (e: IllegalArgumentException) {
+                        call.respondError(HttpStatusCode.BadRequest, messageKey = MessageKeys.INVALID_REQUEST, message = e.message)
+                    } catch (e: Exception) {
+                        call.respondError(HttpStatusCode.InternalServerError, messageKey = MessageKeys.CHALLENGE_DETAILS_FAILED, message = "Failed to get share link: ${e.message}")
+                    }
+                }
+                
+                /**
+                 * POST /api/challenges/share/track
+                 * Track share event (install, app_open) (requires authentication)
+                 * Request body: { "token": "encoded_token", "eventType": "INSTALL", "deviceId": "device123" }
+                 * OR: { "shareCode": "ABC123", "eventType": "INSTALL", "deviceId": "device123" }
+                 */
+                post("/share/track") {
+                    try {
+                        val userId = call.requireUserId()
+                        val request = call.receive<TrackShareEventRequest>()
+                        
+                        // Validate event type
+                        if (request.eventType !in listOf("INSTALL", "APP_OPEN")) {
+                            throw IllegalArgumentException("Invalid event type. Must be INSTALL or APP_OPEN")
+                        }
+                        
+                        // Get share code from token or direct shareCode
+                        val shareCode = if (request.token != null) {
+                            // Decode token to get share code
+                            val decoded = com.apptime.code.common.TokenEncoder.decodeChallengeShare(request.token)
+                                ?: throw IllegalArgumentException("Invalid token")
+                            decoded.second // Return shareCode from decoded token
+                        } else if (request.shareCode != null) {
+                            request.shareCode
+                        } else {
+                            throw IllegalArgumentException("Either token or shareCode must be provided")
+                        }
+                        
+                        // Track the event
+                        repository.trackShareEvent(
+                            shareCode = shareCode,
+                            eventType = request.eventType,
+                            installerUserId = userId,
+                            deviceId = request.deviceId
+                        )
+                        
+                        call.respondApi(
+                            mapOf("message" to "Event tracked successfully"),
+                            statusCode = HttpStatusCode.Created,
+                            messageKey = MessageKeys.CHALLENGE_STATS_SUBMITTED
+                        )
+                    } catch (e: IllegalArgumentException) {
+                        call.respondError(HttpStatusCode.BadRequest, messageKey = MessageKeys.INVALID_REQUEST, message = e.message)
+                    } catch (e: Exception) {
+                        call.respondError(HttpStatusCode.InternalServerError, messageKey = MessageKeys.CHALLENGE_STATS_FAILED, message = "Failed to track event: ${e.message}")
+                    }
+                }
+                
+                /**
+                 * GET /api/challenges/share/stats
+                 * Get share statistics for the authenticated user (requires authentication)
+                 * Returns: Total shares, clicks, and installations
+                 */
+                get("/share/stats") {
+                    try {
+                        val userId = call.requireUserId()
+                        val stats = repository.getUserShareStats(userId)
+                        
+                        val response = ShareStatsResponse(
+                            totalShares = stats.totalShares,
+                            totalClicks = stats.totalClicks,
+                            totalInstalls = stats.totalInstalls
+                        )
+                        
+                        call.respondApi(response, messageKey = MessageKeys.CHALLENGE_DETAILS_RETRIEVED)
+                    } catch (e: Exception) {
+                        call.respondError(HttpStatusCode.InternalServerError, messageKey = MessageKeys.CHALLENGE_DETAILS_FAILED, message = "Failed to get share stats: ${e.message}")
                     }
                 }
             }
