@@ -413,6 +413,7 @@ data class MemberActivityStats(
     val totalScreenTime: Long, // in milliseconds
     val appCount: Int, // Number of unique apps used
     val categoryCount: Int, // Number of unique categories
-    val rank: Int // Rank based on screen time
+    val rank: Int, // Rank based on screen time
+    val topApps: List<TopAppUsage> = emptyList() // Top apps used by the member
 )
 

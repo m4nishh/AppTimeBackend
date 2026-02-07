@@ -13,6 +13,14 @@ import java.time.temporal.WeekFields
 import java.util.*
 import kotlin.random.Random
 import usage.AppUsageEvents
+import com.apptime.code.appstats.AppStats
+import com.apptime.code.appstats.AppStatEntry
+import kotlinx.serialization.json.Json
+import kotlinx.datetime.toKotlinLocalDate
+import kotlinx.datetime.toJavaLocalDate
+import kotlinx.datetime.DatePeriod
+import kotlinx.datetime.plus
+import kotlinx.datetime.minus
 
 class ClanRepository {
     
@@ -1335,47 +1343,92 @@ class ClanRepository {
                     Pair(date.atStartOfDay(), date.plusDays(1).atStartOfDay())
                 }
             }
+            
+            // Convert to kotlinx.datetime.LocalDate for AppStats query
+            // We use the start of the day from java LocalDate
+            val startKotlinDate = kotlinx.datetime.LocalDate.parse(startDate.toLocalDate().toString())
+            val endKotlinDate = kotlinx.datetime.LocalDate.parse(endDate.toLocalDate().toString())
 
-            val startInstant = startDate
-            val endInstant = endDate
-
-
-            // Get all app usage events for clan members in the period
-            val events = AppUsageEvents.select {
-                (AppUsageEvents.userId inList members) and
-                (AppUsageEvents.eventTimestamp greaterEq startInstant) and
-                (AppUsageEvents.eventTimestamp lessEq endInstant) and
-                (AppUsageEvents.duration.isNotNull())
+            // Get all app stats for clan members in the period
+            val statsRows = AppStats.select {
+                (AppStats.userId inList members) and
+                (AppStats.date greaterEq startKotlinDate) and
+                (AppStats.date lessEq endKotlinDate)
             }.toList()
             
+            val json = Json { ignoreUnknownKeys = true }
+
             // Aggregate by package/app
             val appUsageMap = mutableMapOf<String, AppUsageData>()
             val userAppMap = mutableMapOf<String, MutableSet<String>>() // package -> set of userIds
             
-            for (event in events) {
-                val packageName = event[AppUsageEvents.packageName]
-                val appName = event[AppUsageEvents.appName]
-                val duration = event[AppUsageEvents.duration] ?: 0L
-                val userId = event[AppUsageEvents.userId]
+            // Member activity map
+            val memberActivityMap = mutableMapOf<String, MemberActivityData>()
+            val memberAppMap = mutableMapOf<String, MutableSet<String>>()
+            val memberCategoryMap = mutableMapOf<String, MutableSet<String?>>()
+            val userSpecificAppUsage = mutableMapOf<String, MutableList<AppStatEntry>>()
+
+            for (row in statsRows) {
+                val userId = row[AppStats.userId]
+                val statsJson = row[AppStats.statsJson]
                 
-                val key = packageName
-                if (!appUsageMap.containsKey(key)) {
-                    appUsageMap[key] = AppUsageData(
-                        packageName = packageName,
-                        appName = appName,
-                        totalTime = 0L,
-                        userCount = 0
-                    )
-                    userAppMap[key] = mutableSetOf()
+                try {
+                    val appStatsList = json.decodeFromString<List<AppStatEntry>>(statsJson)
+                    
+                    // Collect all app stats for this user
+                    if (!userSpecificAppUsage.containsKey(userId)) {
+                        userSpecificAppUsage[userId] = mutableListOf()
+                    }
+                    userSpecificAppUsage[userId]!!.addAll(appStatsList)
+                    
+                    for (appStat in appStatsList) {
+                        val packageName = appStat.packagename
+                        val appName = appStat.appname
+                        val duration = appStat.duration
+                        val category = inferCategory(packageName, appName)
+                        
+                        // Update App Usage Map
+                        val key = packageName
+                        if (!appUsageMap.containsKey(key)) {
+                            appUsageMap[key] = AppUsageData(
+                                packageName = packageName,
+                                appName = appName,
+                                totalTime = 0L,
+                                userCount = 0
+                            )
+                            userAppMap[key] = mutableSetOf()
+                        }
+                        
+                        appUsageMap[key] = appUsageMap[key]!!.copy(
+                            totalTime = appUsageMap[key]!!.totalTime + duration
+                        )
+                        userAppMap[key]!!.add(userId)
+                        
+                        // Update Member Activity Map
+                        if (!memberActivityMap.containsKey(userId)) {
+                            memberActivityMap[userId] = MemberActivityData(
+                                userId = userId,
+                                totalScreenTime = 0L,
+                                appCount = 0,
+                                categoryCount = 0
+                            )
+                            memberAppMap[userId] = mutableSetOf()
+                            memberCategoryMap[userId] = mutableSetOf()
+                        }
+                        
+                        memberActivityMap[userId] = memberActivityMap[userId]!!.copy(
+                            totalScreenTime = memberActivityMap[userId]!!.totalScreenTime + duration
+                        )
+                        memberAppMap[userId]!!.add(packageName)
+                        memberCategoryMap[userId]!!.add(category)
+                    }
+                } catch (e: Exception) {
+                    // Ignore parsing errors
+                    continue
                 }
-                
-                appUsageMap[key] = appUsageMap[key]!!.copy(
-                    totalTime = appUsageMap[key]!!.totalTime + duration
-                )
-                userAppMap[key]!!.add(userId)
             }
             
-            // Update user counts
+            // Update user counts for apps
             appUsageMap.forEach { (key, data) ->
                 appUsageMap[key] = data.copy(userCount = userAppMap[key]!!.size)
             }
@@ -1406,14 +1459,14 @@ class ClanRepository {
                 }
             }
             
-            // Update member counts
+            // Update member counts for categories
             categoryUsageMap.forEach { (category, data) ->
                 categoryUsageMap[category] = data.copy(memberCount = categoryUserMap[category]!!.size)
             }
             
             val totalScreenTime = categoryUsageMap.values.sumOf { it.totalTime }
             
-            // Calculate percentages
+            // Calculate percentages for categories
             val categoryBreakdown = categoryUsageMap.values.map { data ->
                 val percentage = if (totalScreenTime > 0) {
                     (data.totalTime.toDouble() / totalScreenTime.toDouble()) * 100.0
@@ -1445,39 +1498,9 @@ class ClanRepository {
                     )
                 }
                 .sortedByDescending { it.totalTime }
-                .take(20)
+                .take(5)
             
-            // Member activity
-            val memberActivityMap = mutableMapOf<String, MemberActivityData>()
-            val memberAppMap = mutableMapOf<String, MutableSet<String>>()
-            val memberCategoryMap = mutableMapOf<String, MutableSet<String?>>()
-            
-            for (event in events) {
-                val userId = event[AppUsageEvents.userId]
-                val packageName = event[AppUsageEvents.packageName]
-                val duration = event[AppUsageEvents.duration] ?: 0L
-                val appName = event[AppUsageEvents.appName]
-                val category = inferCategory(packageName, appName)
-                
-                if (!memberActivityMap.containsKey(userId)) {
-                    memberActivityMap[userId] = MemberActivityData(
-                        userId = userId,
-                        totalScreenTime = 0L,
-                        appCount = 0,
-                        categoryCount = 0
-                    )
-                    memberAppMap[userId] = mutableSetOf()
-                    memberCategoryMap[userId] = mutableSetOf()
-                }
-                
-                memberActivityMap[userId] = memberActivityMap[userId]!!.copy(
-                    totalScreenTime = memberActivityMap[userId]!!.totalScreenTime + duration
-                )
-                memberAppMap[userId]!!.add(packageName)
-                memberCategoryMap[userId]!!.add(category)
-            }
-            
-            // Update counts
+            // Update counts for member activity
             memberActivityMap.forEach { (userId, data) ->
                 memberActivityMap[userId] = data.copy(
                     appCount = memberAppMap[userId]!!.size,
@@ -1497,13 +1520,40 @@ class ClanRepository {
             val memberActivity = memberActivityMap.values
                 .sortedByDescending { it.totalScreenTime }
                 .mapIndexed { index, data ->
+                    // Calculate top apps for this user
+                    val userApps = userSpecificAppUsage[data.userId] ?: emptyList()
+                    
+                    // Aggregate duplicates (if multiple days selected)
+                    val aggregatedUserApps = userApps
+                        .groupBy { it.packagename }
+                        .map { (pkg, entries) ->
+                            val first = entries.first()
+                            AppStatEntry(
+                                appname = first.appname,
+                                packagename = pkg,
+                                duration = entries.sumOf { it.duration }
+                            )
+                        }
+                        .sortedByDescending { it.duration }
+                        .take(1) // Top 10 apps per user
+                        .map { appStat ->
+                            TopAppUsage(
+                                packageName = appStat.packagename,
+                                appName = appStat.appname,
+                                totalTime = appStat.duration,
+                                userCount = 1,
+                                averageTime = appStat.duration
+                            )
+                        }
+
                     MemberActivityStats(
                         userId = data.userId,
                         username = usernameMap[data.userId],
                         totalScreenTime = data.totalScreenTime,
                         appCount = data.appCount,
                         categoryCount = data.categoryCount,
-                        rank = index + 1
+                        rank = index + 1,
+                        topApps = aggregatedUserApps
                     )
                 }
             
@@ -1517,6 +1567,7 @@ class ClanRepository {
             )
         }
     }
+
     
     /**
      * Infer app category from package name and app name
