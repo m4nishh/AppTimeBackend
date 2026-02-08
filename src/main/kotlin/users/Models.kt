@@ -30,6 +30,7 @@ data class DeviceRegistrationResponse(
     val totpEnabled: Boolean = true
 )
 
+
 @Serializable
 data class UserProfile(
     val userId: String,
@@ -38,6 +39,7 @@ data class UserProfile(
     val name: String? = null,
     val country: String? = null, // User's country (ISO country code or name)
     val firebaseToken: String? = null, // Firebase Cloud Messaging (FCM) token
+    val referralCode: String? = null, // Derived from userId
     val createdAt: String? = null,
     val updatedAt: String? = null,
     val lastSyncTime: String? = null // ISO 8601 format - syncTime from usage events batch request
@@ -76,11 +78,13 @@ data class PublicUserProfile(
     val email: String? = null,
     val name: String? = null,
     val country: String? = null, // User's country (ISO country code or name)
+    val referralCode: String? = null, // Derived from userId
     val createdAt: String? = null,
     val updatedAt: String? = null,
     val lastSyncTime: String? = null // ISO 8601 format - syncTime from usage events batch request
     // userId is NEVER included in public profile
 )
+
 
 @Serializable
 data class SimpleResponse(

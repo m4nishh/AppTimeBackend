@@ -137,6 +137,7 @@ object TokenEncoder {
         return encode("$clanId|$shareCode")
     }
     
+
     /**
      * Decode clan share token back to clan ID and share code
      * Returns Pair<clanId, shareCode> or null if invalid
@@ -153,6 +154,32 @@ object TokenEncoder {
         val shareCode = parts[1]
         
         return Pair(clanId, shareCode)
+    }
+
+    /**
+     * Encode clan ID and invite code into a secure token
+     * Format: clanId|inviteCode -> encrypted -> base64
+     */
+    fun encodeClanInvite(clanId: Long, inviteCode: String): String {
+        return encode("$clanId|$inviteCode")
+    }
+
+    /**
+     * Decode clan invite token back to clan ID and invite code
+     * Returns Pair<clanId, inviteCode> or null if invalid
+     */
+    fun decodeClanInvite(token: String): Pair<Long, String>? {
+        val decoded = decode(token) ?: return null
+        
+        val parts = decoded.split("|")
+        if (parts.size != 2) {
+            return null
+        }
+        
+        val clanId = parts[0].toLongOrNull() ?: return null
+        val inviteCode = parts[1]
+        
+        return Pair(clanId, inviteCode)
     }
     
     /**

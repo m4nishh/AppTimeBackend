@@ -139,6 +139,7 @@ class UserRepository {
         }
     }
 
+
     /**
      * Get user by userId
      */
@@ -154,6 +155,7 @@ class UserRepository {
                         name = row[Users.name],
                         country = row[Users.country],
                         firebaseToken = row[Users.firebaseToken],
+                        referralCode = row[Users.userId].take(8).uppercase(), // Derived from userId
                         createdAt = row[Users.createdAt].toString(),
                         updatedAt = row[Users.updatedAt].toString(),
                         lastSyncTime = row[Users.lastSyncTime]?.toString() // ISO 8601 format
@@ -320,6 +322,7 @@ class UserRepository {
                         name = row[Users.name],
                         country = row[Users.country],
                         firebaseToken = row[Users.firebaseToken],
+                        referralCode = row[Users.userId].take(8).uppercase(), // Derived from userId
                         createdAt = row[Users.createdAt].toString(),
                         updatedAt = row[Users.updatedAt].toString(),
                         lastSyncTime = row[Users.lastSyncTime]?.toString() // ISO 8601 format
