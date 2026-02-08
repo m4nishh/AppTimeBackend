@@ -174,6 +174,7 @@ enum class CoinSource {
     ADMIN_GRANT,             // Admin manually granted
     PURCHASE,                // Purchased coins
     REDEMPTION,              // Redeemed coins for rewards
+    HOURLY_STAT_REWARD,      // Hourly reward for sharing stats
     OTHER                    // Other activities
 }
 

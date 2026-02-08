@@ -3,7 +3,11 @@ package com.apptime.code.rewards
 import com.apptime.code.challenges.ChallengeRepository
 import com.apptime.code.notifications.NotificationService
 import com.apptime.code.notifications.NotificationQueueService
+import com.apptime.code.appstats.AppStatsRepository
 import kotlinx.datetime.Clock
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.toLocalDateTime
+import kotlinx.datetime.toInstant
 
 /**
  * Reward service layer - handles business logic
@@ -11,7 +15,8 @@ import kotlinx.datetime.Clock
 class RewardService(
     private val repository: RewardRepository,
     private val challengeRepository: ChallengeRepository? = null,
-    private val notificationService: NotificationService? = null
+    private val notificationService: NotificationService? = null,
+    private val appStatsRepository: AppStatsRepository? = null
 ) {
     
     /**
@@ -597,6 +602,60 @@ class RewardService(
         }
     }
     
+    /**
+     * Process hourly stat reward for a single user
+     * Called when user submits app stats
+     * Awards 10 coins for every 1 hour of usage accumulated today
+     */
+    suspend fun processHourlyStatRewardForUser(userId: String) {
+        if (appStatsRepository == null) {
+            println("⚠️ [RewardService] AppStatsRepository not available, skipping hourly rewards")
+            return
+        }
+
+        val now = Clock.System.now()
+        val today = now.toLocalDateTime(TimeZone.currentSystemDefault()).date
+        
+        try {
+            // 1. Get total duration for today (in milliseconds)
+            val totalDurationMs = appStatsRepository.getTotalUsageDurationForDate(userId, today)
+            
+            // 2. Calculate eligible coins (10 coins per hour)
+            // 1 hour = 3600000 ms
+            val hours = totalDurationMs / 3600000
+            val eligibleCoins = hours * 10
+            
+            if (eligibleCoins <= 0) {
+                 return
+            }
+
+            // 3. Get coins already awarded today for this source
+            val coinsAwarded = repository.getCoinsReceivedForSourceOnDate(
+                userId = userId,
+                source = CoinSource.HOURLY_STAT_REWARD,
+                date = today
+            )
+            
+            // 4. Calculate difference
+            val coinsToAward = eligibleCoins - coinsAwarded
+            
+            if (coinsToAward > 0) {
+                 addCoins(
+                    AddCoinsRequest(
+                        userId = userId,
+                        amount = coinsToAward,
+                        source = CoinSource.HOURLY_STAT_REWARD.name,
+                        description = "Hourly reward for reaching $hours hours of usage today"
+                    )
+                )
+                println("✅ [RewardService] Awarded $coinsToAward coins to user $userId (Total hours: $hours)")
+            } 
+        } catch (e: Exception) {
+            println("❌ [RewardService] Failed to award hourly coins to $userId: ${e.message}")
+            e.printStackTrace()
+        }
+    }
+
     // ========== TRANSACTION METHODS ==========
     
     /**

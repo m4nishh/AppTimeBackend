@@ -11,6 +11,12 @@ import io.ktor.server.request.*
 import io.ktor.server.routing.*
 import users.UserRepository
 import users.UserService
+import com.apptime.code.rewards.RewardService
+import com.apptime.code.rewards.RewardRepository
+import com.apptime.code.challenges.ChallengeRepository
+import com.apptime.code.notifications.NotificationService
+import com.apptime.code.notifications.NotificationRepository
+import kotlinx.coroutines.launch
 
 /**
  * Configure app stats routes
@@ -20,6 +26,13 @@ fun Application.configureAppStatsRoutes() {
     val service = AppStatsService(repository)
     val userRepository = UserRepository()
     val userService = UserService(userRepository)
+    
+    // Dependencies for RewardService
+    val rewardRepository = RewardRepository()
+    val challengeRepository = ChallengeRepository()
+    val notificationRepository = NotificationRepository()
+    val notificationService = NotificationService(notificationRepository, userRepository)
+    val rewardService = RewardService(rewardRepository, challengeRepository, notificationService, repository)
     
     routing {
         route("/api/app-stats") {
@@ -56,6 +69,17 @@ fun Application.configureAppStatsRoutes() {
                             HttpStatusCode.OK
                         } else {
                             HttpStatusCode.Created
+                        }
+                        
+
+                        
+                        // Process hourly stat rewards (fire and forget / async)
+                        launch {
+                            try {
+                                rewardService.processHourlyStatRewardForUser(currentUserId)
+                            } catch (e: Exception) {
+                                println("Failed to process hourly reward trigger: ${e.message}")
+                            }
                         }
                         
                         call.respondApi(response, statusCode = statusCode, messageKey = messageKey)

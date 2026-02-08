@@ -7,6 +7,7 @@ import com.apptime.code.leaderboard.LeaderboardService
 import com.apptime.code.rewards.ChallengeRewardsQueueService
 import com.apptime.code.rewards.RewardRepository
 import com.apptime.code.rewards.RewardService
+import com.apptime.code.appstats.AppStatsRepository
 import io.ktor.server.application.*
 import kotlinx.coroutines.*
 import org.slf4j.LoggerFactory
@@ -112,6 +113,7 @@ class ScheduledJobs(
         }
     }
     
+
     /**
      * Stop all scheduled jobs
      */
@@ -136,7 +138,9 @@ fun Application.configureScheduledJobs() {
     val notificationService = com.apptime.code.notifications.NotificationService(notificationRepository, userRepository)
     val challengeService = ChallengeService(challengeRepository, notificationService)
     val rewardRepository = RewardRepository()
-    val rewardService = RewardService(rewardRepository, challengeRepository, notificationService)
+
+    val appStatsRepository = AppStatsRepository()
+    val rewardService = RewardService(rewardRepository, challengeRepository, notificationService, appStatsRepository)
     val scheduledJobs = ScheduledJobs(leaderboardService, challengeService, rewardService)
 
     // Start the async challenge rewards queue worker
@@ -163,6 +167,8 @@ fun Application.configureScheduledJobs() {
     
     // Start fast challenge rewards check (every 2 minutes) for quick coin delivery
     scheduledJobs.startFastChallengeRewardsCheckJob(this)
+
+
     
     // Store reference to stop jobs when application shuts down
     environment.monitor.subscribe(ApplicationStopped) {

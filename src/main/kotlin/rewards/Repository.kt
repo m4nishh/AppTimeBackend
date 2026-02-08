@@ -3,6 +3,11 @@ package com.apptime.code.rewards
 import com.apptime.code.common.dbTransaction
 import org.jetbrains.exposed.sql.*
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
+import kotlinx.datetime.atStartOfDayIn
+import kotlinx.datetime.plus
+import kotlinx.datetime.DatePeriod
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.LocalDate
 
 class RewardRepository {
     
@@ -744,6 +749,44 @@ class RewardRepository {
                 }
             }
             true
+        }
+    }
+    /**
+     * Check if user has received coins from a specific source after a timestamp
+     */
+    fun hasReceivedCoinForSourceAfter(
+        userId: String,
+        source: CoinSource,
+        timestamp: kotlinx.datetime.Instant
+    ): Boolean {
+        return dbTransaction {
+            Coins.select {
+                (Coins.userId eq userId) and
+                (Coins.coinSource eq source.name) and
+                (Coins.createdAt greaterEq timestamp)
+            }.count() > 0
+        }
+    }
+
+    /**
+     * Get total coins received from a specific source on a given date
+     */
+    fun getCoinsReceivedForSourceOnDate(
+        userId: String,
+        source: CoinSource,
+        date: kotlinx.datetime.LocalDate
+    ): Long {
+        return dbTransaction {
+            val timeZone = kotlinx.datetime.TimeZone.currentSystemDefault()
+            val startOfDay = date.atStartOfDayIn(timeZone)
+            val endOfDay = date.plus(kotlinx.datetime.DatePeriod(days = 1)).atStartOfDayIn(timeZone)
+
+            Coins.select {
+                (Coins.userId eq userId) and
+                (Coins.coinSource eq source.name) and
+                (Coins.createdAt greaterEq startOfDay) and
+                (Coins.createdAt less endOfDay)
+            }.sumOf { it[Coins.amount] }
         }
     }
 }

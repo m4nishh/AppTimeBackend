@@ -313,6 +313,8 @@ class NotificationService(
             "ACHIEVEMENT" -> "completing an achievement"
             "ADMIN_GRANT" -> "admin grant"
             "PURCHASE" -> "purchase"
+            "PURCHASE" -> "purchase"
+            "HOURLY_STAT_REWARD" -> "sharing your daily stats"
             else -> "activity"
         }
         
