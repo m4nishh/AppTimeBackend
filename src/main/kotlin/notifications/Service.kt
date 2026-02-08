@@ -313,6 +313,8 @@ class NotificationService(
             "ACHIEVEMENT" -> "completing an achievement"
             "ADMIN_GRANT" -> "admin grant"
             "PURCHASE" -> "purchase"
+            "PURCHASE" -> "purchase"
+            "HOURLY_STAT_REWARD" -> "sharing your daily stats"
             else -> "activity"
         }
         
@@ -639,6 +641,316 @@ class NotificationService(
             type = "welcome_bonus",
             deeplink = "rewards"
         )
+    }
+    
+    // ========== CLAN NOTIFICATION METHODS ==========
+    
+    /**
+     * Send notification when a member joins a clan
+     * Notifies all clan members (except the new member)
+     */
+    suspend fun sendClanMemberJoinedNotification(
+        clanId: Long,
+        clanName: String,
+        newMemberUsername: String?,
+        newMemberUserId: String,
+        memberUserIds: List<String>
+    ) {
+        val displayName = newMemberUsername ?: "A new member"
+        val text = "$displayName joined your clan '$clanName'!"
+        
+        for (userId in memberUserIds) {
+            if (userId != newMemberUserId) {
+                try {
+                    createAndSendNotification(
+                        userId = userId,
+                        title = "New Clan Member! 👥",
+                        text = text,
+                        type = "clan_member_joined",
+                        deeplink = "apptime://screen/clan_detail/$clanId"
+                    )
+                } catch (e: Exception) {
+                    logger.warning("Failed to send clan member joined notification to user $userId: ${e.message}")
+                }
+            }
+        }
+    }
+    
+    /**
+     * Send notification when a member leaves a clan
+     * Notifies all remaining clan members
+     */
+    suspend fun sendClanMemberLeftNotification(
+        clanId: Long,
+        clanName: String,
+        leftMemberUsername: String?,
+        leftMemberUserId: String,
+        memberUserIds: List<String>
+    ) {
+        val displayName = leftMemberUsername ?: "A member"
+        val text = "$displayName left your clan '$clanName'."
+        
+        for (userId in memberUserIds) {
+            try {
+                createAndSendNotification(
+                    userId = userId,
+                    title = "Member Left Clan 👋",
+                    text = text,
+                    type = "clan_member_left",
+                    deeplink = "apptime://screen/clan_detail/$clanId"
+                )
+            } catch (e: Exception) {
+                logger.warning("Failed to send clan member left notification to user $userId: ${e.message}")
+            }
+        }
+    }
+    
+    /**
+     * Send notification when a member's role is changed
+     */
+    suspend fun sendClanRoleChangedNotification(
+        userId: String,
+        clanId: Long,
+        clanName: String,
+        newRole: String,
+        changedByUsername: String?
+    ) {
+        val roleText = when (newRole.uppercase()) {
+            "ADMIN" -> "admin"
+            "MODERATOR" -> "moderator"
+            "MEMBER" -> "member"
+            else -> newRole.lowercase()
+        }
+        
+        val changedByText = if (changedByUsername != null) {
+            " by $changedByUsername"
+        } else {
+            ""
+        }
+        
+        createAndSendNotification(
+            userId = userId,
+            title = "Role Updated! ⭐",
+            text = "Your role in '$clanName' has been changed to $roleText$changedByText.",
+            type = "clan_role_changed",
+            deeplink = "apptime://screen/clan_detail/$clanId"
+        )
+    }
+    
+    /**
+     * Send notification when a member is removed from clan
+     */
+    suspend fun sendClanMemberRemovedNotification(
+        userId: String,
+        clanId: Long,
+        clanName: String,
+        removedByUsername: String?,
+        reason: String?
+    ) {
+        val removedByText = if (removedByUsername != null) {
+            " by $removedByUsername"
+        } else {
+            ""
+        }
+        
+        val reasonText = if (reason != null) {
+            " Reason: $reason"
+        } else {
+            ""
+        }
+        
+        createAndSendNotification(
+            userId = userId,
+            title = "Removed from Clan ❌",
+            text = "You have been removed from '$clanName'$removedByText.$reasonText",
+            type = "clan_member_removed",
+            deeplink = "clans"
+        )
+    }
+    
+    /**
+     * Send notification when user receives a clan invite
+     */
+    suspend fun sendClanInviteReceivedNotification(
+        userId: String,
+        clanId: Long,
+        clanName: String,
+        inviterUsername: String?,
+        inviteCode: String
+    ) {
+        val inviterText = if (inviterUsername != null) {
+            "$inviterUsername invited you"
+        } else {
+            "You've been invited"
+        }
+        
+        createAndSendNotification(
+            userId = userId,
+            title = "Clan Invitation! 📨",
+            text = "$inviterText to join '$clanName'.",
+            type = "clan_invite_received",
+            deeplink = "apptime://screen/clan_invite/$inviteCode"
+        )
+    }
+    
+    /**
+     * Send notification when a join request is created (to admins/moderators)
+     */
+    suspend fun sendClanJoinRequestNotification(
+        clanId: Long,
+        clanName: String,
+        requesterUsername: String?,
+        requesterUserId: String,
+        adminAndModeratorUserIds: List<String>
+    ) {
+        val requesterText = requesterUsername ?: "A user"
+        
+        for (userId in adminAndModeratorUserIds) {
+            try {
+                createAndSendNotification(
+                    userId = userId,
+                    title = "New Join Request! 📝",
+                    text = "$requesterText wants to join '$clanName'.",
+                    type = "clan_join_request",
+                    deeplink = "apptime://screen/clan_join_requests/$clanId"
+                )
+            } catch (e: Exception) {
+                logger.warning("Failed to send join request notification to user $userId: ${e.message}")
+            }
+        }
+    }
+    
+    /**
+     * Send notification when a join request is approved
+     */
+    suspend fun sendClanJoinRequestApprovedNotification(
+        userId: String,
+        clanId: Long,
+        clanName: String,
+        approvedByUsername: String?
+    ) {
+        val approvedByText = if (approvedByUsername != null) {
+            " by $approvedByUsername"
+        } else {
+            ""
+        }
+        
+        createAndSendNotification(
+            userId = userId,
+            title = "Join Request Approved! ✅",
+            text = "Your request to join '$clanName' has been approved$approvedByText. Welcome to the clan!",
+            type = "clan_join_approved",
+            deeplink = "apptime://screen/clan_detail/$clanId"
+        )
+    }
+    
+    /**
+     * Send notification when a join request is rejected
+     */
+    suspend fun sendClanJoinRequestRejectedNotification(
+        userId: String,
+        clanId: Long,
+        clanName: String,
+        rejectedByUsername: String?,
+        reason: String?
+    ) {
+        val rejectedByText = if (rejectedByUsername != null) {
+            " by $rejectedByUsername"
+        } else {
+            ""
+        }
+        
+        val reasonText = if (reason != null) {
+            " Reason: $reason"
+        } else {
+            ""
+        }
+        
+        createAndSendNotification(
+            userId = userId,
+            title = "Join Request Rejected ❌",
+            text = "Your request to join '$clanName' has been rejected$rejectedByText.$reasonText",
+            type = "clan_join_rejected",
+            deeplink = "clans"
+        )
+    }
+    
+    /**
+     * Send notification when clan is created (to creator)
+     */
+    suspend fun sendClanCreatedNotification(
+        userId: String,
+        clanId: Long,
+        clanName: String
+    ) {
+        createAndSendNotification(
+            userId = userId,
+            title = "Clan Created! 🎉",
+            text = "Your clan '$clanName' has been created successfully. Start inviting members!",
+            type = "clan_created",
+            deeplink = "apptime://screen/clan_detail/$clanId"
+        )
+    }
+    
+    /**
+     * Send notification when clan details are updated (to all members)
+     */
+    suspend fun sendClanUpdatedNotification(
+        clanId: Long,
+        clanName: String,
+        memberUserIds: List<String>,
+        updatedByUsername: String?
+    ) {
+        val updatedByText = if (updatedByUsername != null) {
+            " by $updatedByUsername"
+        } else {
+            ""
+        }
+        
+        for (userId in memberUserIds) {
+            try {
+                createAndSendNotification(
+                    userId = userId,
+                    title = "Clan Updated! ✏️",
+                    text = "Details of '$clanName' have been updated$updatedByText.",
+                    type = "clan_updated",
+                    deeplink = "apptime://screen/clan_detail/$clanId"
+                )
+            } catch (e: Exception) {
+                logger.warning("Failed to send clan updated notification to user $userId: ${e.message}")
+            }
+        }
+    }
+    
+    /**
+     * Send notification when clan achieves a milestone/badge
+     */
+    suspend fun sendClanBadgeEarnedNotification(
+        clanId: Long,
+        clanName: String,
+        badgeTitle: String,
+        badgeDescription: String?,
+        memberUserIds: List<String>
+    ) {
+        val descriptionText = if (badgeDescription != null) {
+            " $badgeDescription"
+        } else {
+            ""
+        }
+        
+        for (userId in memberUserIds) {
+            try {
+                createAndSendNotification(
+                    userId = userId,
+                    title = "Clan Badge Earned! 🏅",
+                    text = "Your clan '$clanName' earned the badge: $badgeTitle.$descriptionText",
+                    type = "clan_badge_earned",
+                    deeplink = "apptime://screen/clan_detail/$clanId"
+                )
+            } catch (e: Exception) {
+                logger.warning("Failed to send clan badge notification to user $userId: ${e.message}")
+            }
+        }
     }
 }
 

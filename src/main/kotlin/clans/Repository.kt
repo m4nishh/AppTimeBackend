@@ -12,6 +12,15 @@ import java.time.format.DateTimeFormatter
 import java.time.temporal.WeekFields
 import java.util.*
 import kotlin.random.Random
+import usage.AppUsageEvents
+import com.apptime.code.appstats.AppStats
+import com.apptime.code.appstats.AppStatEntry
+import kotlinx.serialization.json.Json
+import kotlinx.datetime.toKotlinLocalDate
+import kotlinx.datetime.toJavaLocalDate
+import kotlinx.datetime.DatePeriod
+import kotlinx.datetime.plus
+import kotlinx.datetime.minus
 
 class ClanRepository {
     
@@ -92,6 +101,7 @@ class ClanRepository {
             }
             
             Clan(
+                id = clan[Clans.id].value,
                 name = clan[Clans.name],
                 description = clan[Clans.description],
                 tagline = clan[Clans.tagline],
@@ -167,6 +177,30 @@ class ClanRepository {
         return dbTransaction {
             var query = Clans.select { Clans.isActive eq true }
             
+            // Privacy: Only show PUBLIC clans to non-members
+            // PRIVATE and INVITE_ONLY clans are only visible to members or users with pending join requests
+            if (requestingUserId == null) {
+                // Not logged in - only show PUBLIC clans
+                query = query.andWhere { Clans.clanType eq "PUBLIC" }
+            } else {
+                // Logged in - show PUBLIC clans + PRIVATE/INVITE_ONLY clans where user is a member or has pending request
+                val userClanIds = ClanMembers.select {
+                    (ClanMembers.userId eq requestingUserId) and (ClanMembers.isActive eq true)
+                }.map { it[ClanMembers.clanId] }.toSet()
+                
+                val pendingRequestClanIds = ClanJoinRequests.select {
+                    (ClanJoinRequests.userId eq requestingUserId) and (ClanJoinRequests.status eq "PENDING")
+                }.map { it[ClanJoinRequests.clanId] }.toSet()
+                
+                val visibleClanIds = userClanIds + pendingRequestClanIds
+                
+                // Show PUBLIC clans OR clans where user is a member/has pending request
+                query = query.andWhere {
+                    (Clans.clanType eq "PUBLIC") or 
+                    ((Clans.clanType inList listOf("PRIVATE", "INVITE_ONLY")) and (Clans.id inList visibleClanIds))
+                }
+            }
+            
             if (category != null) {
                 query = query.andWhere { Clans.category eq category }
             }
@@ -210,6 +244,7 @@ class ClanRepository {
                     }
                     
                     Clan(
+                        id = row[Clans.id].value,
                         name = row[Clans.name],
                         description = row[Clans.description],
                         tagline = row[Clans.tagline],
@@ -575,6 +610,21 @@ class ClanRepository {
         }
     }
     
+    /**
+     * Get clan stats for a specific period
+     */
+    fun getClanStatsByPeriod(clanId: Long, period: String, periodDate: String): Long {
+        return dbTransaction {
+            val stats = ClanStats.select {
+                (ClanStats.clanId eq clanId) and
+                (ClanStats.period eq period) and
+                (ClanStats.periodDate eq periodDate)
+            }.firstOrNull()
+            
+            stats?.get(ClanStats.totalFocusHours) ?: 0L
+        }
+    }
+    
     private fun getWeekDate(date: LocalDate): String {
         val weekFields = WeekFields.of(Locale.getDefault())
         val week = date.get(weekFields.weekOfWeekBasedYear())
@@ -854,6 +904,232 @@ class ClanRepository {
         return (1..8).map { chars.random() }.joinToString("")
     }
     
+    private fun generateShareCode(): String {
+        val random = java.security.SecureRandom()
+        val chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789" // Exclude confusing characters
+        return (1..8).map { chars[random.nextInt(chars.length)] }.joinToString("")
+    }
+    
+    /**
+     * Create or get existing clan share record
+     * Returns the share code for tracking
+     */
+    fun createOrGetClanShare(clanId: Long, sharerUserId: String): String {
+        return dbTransaction {
+            // Check if user already shared this clan
+            val existingShare = ClanShares.select {
+                (ClanShares.clanId eq clanId) and
+                (ClanShares.sharerUserId eq sharerUserId)
+            }.firstOrNull()
+            
+            if (existingShare != null) {
+                return@dbTransaction existingShare[ClanShares.shareCode]
+            }
+            
+            // Generate unique share code
+            var shareCode = generateShareCode()
+            var attempts = 0
+            while (ClanShares.select { ClanShares.shareCode eq shareCode }.count() > 0 && attempts < 10) {
+                shareCode = generateShareCode()
+                attempts++
+            }
+            
+            if (attempts >= 10) {
+                throw IllegalStateException("Failed to generate unique share code")
+            }
+            
+            // Create new share record
+            ClanShares.insert {
+                it[ClanShares.clanId] = clanId
+                it[ClanShares.sharerUserId] = sharerUserId
+                it[ClanShares.shareCode] = shareCode
+                it[ClanShares.clickCount] = 0
+                it[ClanShares.joinCount] = 0
+            }
+            
+            shareCode
+        }
+    }
+    
+    /**
+     * Get share record by share code
+     */
+    fun getClanShareByCode(shareCode: String): ClanShare? {
+        return dbTransaction {
+            ClanShares.select { ClanShares.shareCode eq shareCode }
+                .firstOrNull()
+                ?.let { row ->
+                    ClanShare(
+                        id = row[ClanShares.id],
+                        clanId = row[ClanShares.clanId],
+                        sharerUserId = row[ClanShares.sharerUserId],
+                        shareCode = row[ClanShares.shareCode],
+                        clickCount = row[ClanShares.clickCount],
+                        joinCount = row[ClanShares.joinCount],
+                        createdAt = row[ClanShares.createdAt].toString(),
+                        updatedAt = row[ClanShares.updatedAt].toString()
+                    )
+                }
+        }
+    }
+    
+    /**
+     * Track a clan share event (click, join, app_open, etc.)
+     */
+    fun trackClanShareEvent(
+        shareCode: String,
+        eventType: String,
+        joinerUserId: String? = null,
+        deviceId: String? = null,
+        userAgent: String? = null,
+        ipAddress: String? = null
+    ) {
+        dbTransaction {
+            val share = ClanShares.select { ClanShares.shareCode eq shareCode }.firstOrNull()
+                ?: throw IllegalArgumentException("Invalid share code")
+            
+            val shareId = share[ClanShares.id]
+            
+            // Insert event
+            ClanShareEvents.insert {
+                it[ClanShareEvents.shareId] = shareId
+                it[ClanShareEvents.eventType] = eventType
+                it[ClanShareEvents.joinerUserId] = joinerUserId
+                it[ClanShareEvents.deviceId] = deviceId
+                it[ClanShareEvents.userAgent] = userAgent
+                it[ClanShareEvents.ipAddress] = ipAddress
+            }
+            
+            // Update counters
+            when (eventType) {
+                "CLICK" -> {
+                    ClanShares.update({ ClanShares.id eq shareId }) {
+                        it[ClanShares.clickCount] = share[ClanShares.clickCount] + 1
+                        it[ClanShares.updatedAt] = Clock.System.now()
+                    }
+                }
+                "JOIN", "APP_OPEN" -> {
+                    ClanShares.update({ ClanShares.id eq shareId }) {
+                        it[ClanShares.joinCount] = share[ClanShares.joinCount] + 1
+                        it[ClanShares.updatedAt] = Clock.System.now()
+                    }
+                }
+                else -> {}
+            }
+        }
+    }
+    
+    /**
+     * Get share statistics for a user
+     */
+    fun getUserClanShareStats(userId: String): ClanShareStats {
+        return dbTransaction {
+            val shares = ClanShares.select { ClanShares.sharerUserId eq userId }
+            
+            val totalShares = shares.count()
+            val totalClicks = shares.sumOf { it[ClanShares.clickCount] }
+            val totalJoins = shares.sumOf { it[ClanShares.joinCount] }
+            
+            ClanShareStats(
+                totalShares = totalShares,
+                totalClicks = totalClicks,
+                totalJoins = totalJoins
+            )
+        }
+    }
+    
+    /**
+     * Data class for clan share
+     */
+    data class ClanShare(
+        val id: Long,
+        val clanId: Long,
+        val sharerUserId: String,
+        val shareCode: String,
+        val clickCount: Int,
+        val joinCount: Int,
+        val createdAt: String,
+        val updatedAt: String
+    )
+    
+    /**
+     * Data class for clan share stats
+     */
+    data class ClanShareStats(
+        val totalShares: Long,
+        val totalClicks: Int,
+        val totalJoins: Int
+    )
+    
+    /**
+     * Get or create a permanent share link for a clan
+     * Returns an invite code that never expires and has unlimited uses
+     */
+    fun getOrCreateShareLink(clanId: Long, inviterId: String): ClanInvite {
+        return dbTransaction {
+            // Check if there's already a permanent share link (unlimited uses, no expiration, no specific invitee)
+            val existingShareLink = ClanInvites.select {
+                (ClanInvites.clanId eq clanId) and
+                (ClanInvites.maxUses eq -1) and
+                (ClanInvites.expiresAt.isNull()) and
+                (ClanInvites.inviteeUserId.isNull()) and
+                (ClanInvites.status eq "PENDING")
+            }.firstOrNull()
+            
+            if (existingShareLink != null) {
+                // Return existing share link
+                val clan = Clans.select { Clans.id eq clanId }.firstOrNull()
+                val inviter = Users.select { Users.userId eq inviterId }.firstOrNull()
+                
+                ClanInvite(
+                    clanId = existingShareLink[ClanInvites.clanId],
+                    clanName = clan?.get(Clans.name),
+                    inviterId = existingShareLink[ClanInvites.inviterId],
+                    inviterUsername = inviter?.get(Users.username),
+                    inviteeUserId = existingShareLink[ClanInvites.inviteeUserId],
+                    inviteCode = existingShareLink[ClanInvites.inviteCode],
+                    status = existingShareLink[ClanInvites.status],
+                    maxUses = existingShareLink[ClanInvites.maxUses],
+                    currentUses = existingShareLink[ClanInvites.currentUses],
+                    expiresAt = existingShareLink[ClanInvites.expiresAt]?.toString(),
+                    acceptedAt = existingShareLink[ClanInvites.acceptedAt]?.toString(),
+                    createdAt = existingShareLink[ClanInvites.createdAt].toString()
+                )
+            } else {
+                // Create new permanent share link
+                val inviteCode = generateInviteCode()
+                
+                val inviteId = ClanInvites.insertAndGetId {
+                    it[ClanInvites.clanId] = clanId
+                    it[ClanInvites.inviterId] = inviterId
+                    it[ClanInvites.inviteeUserId] = null
+                    it[ClanInvites.inviteCode] = inviteCode
+                    it[ClanInvites.maxUses] = -1 // Unlimited
+                    it[ClanInvites.expiresAt] = null // Never expires
+                }.value
+                
+                val invite = ClanInvites.select { ClanInvites.id eq inviteId }.first()
+                val clan = Clans.select { Clans.id eq clanId }.firstOrNull()
+                val inviter = Users.select { Users.userId eq inviterId }.firstOrNull()
+                
+                ClanInvite(
+                    clanId = invite[ClanInvites.clanId],
+                    clanName = clan?.get(Clans.name),
+                    inviterId = invite[ClanInvites.inviterId],
+                    inviterUsername = inviter?.get(Users.username),
+                    inviteeUserId = invite[ClanInvites.inviteeUserId],
+                    inviteCode = invite[ClanInvites.inviteCode],
+                    status = invite[ClanInvites.status],
+                    maxUses = invite[ClanInvites.maxUses],
+                    currentUses = invite[ClanInvites.currentUses],
+                    expiresAt = invite[ClanInvites.expiresAt]?.toString(),
+                    acceptedAt = invite[ClanInvites.acceptedAt]?.toString(),
+                    createdAt = invite[ClanInvites.createdAt].toString()
+                )
+            }
+        }
+    }
+    
     /**
      * Create join request for private clans
      */
@@ -871,6 +1147,27 @@ class ClanRepository {
             }.value
             
             val request = ClanJoinRequests.select { ClanJoinRequests.id eq requestId }.first()
+            ClanJoinRequest(
+                clanId = request[ClanJoinRequests.clanId],
+                userId = request[ClanJoinRequests.userId],
+                username = request[ClanJoinRequests.username],
+                message = request[ClanJoinRequests.message],
+                status = request[ClanJoinRequests.status],
+                reviewedBy = request[ClanJoinRequests.reviewedBy],
+                reviewedAt = request[ClanJoinRequests.reviewedAt]?.toString(),
+                createdAt = request[ClanJoinRequests.createdAt].toString()
+            )
+        }
+    }
+    
+    /**
+     * Get join request by ID
+     */
+    fun getJoinRequestById(requestId: Long): ClanJoinRequest? {
+        return dbTransaction {
+            val request = ClanJoinRequests.select { ClanJoinRequests.id eq requestId }
+                .firstOrNull() ?: return@dbTransaction null
+            
             ClanJoinRequest(
                 clanId = request[ClanJoinRequests.clanId],
                 userId = request[ClanJoinRequests.userId],
@@ -989,5 +1286,391 @@ class ClanRepository {
                 }
         }
     }
+    
+    /**
+     * Get app usage analytics for clan members
+     * Aggregates app usage by category, top apps, and member activity
+     */
+    fun getClanAppUsageAnalytics(
+        clanId: Long,
+        period: String, // "daily", "weekly", "monthly"
+        periodDate: String // date string based on period
+    ): ClanAppUsageAnalytics {
+        return dbTransaction {
+            // Get all active clan members
+            val members = ClanMembers.select {
+                (ClanMembers.clanId eq clanId) and (ClanMembers.isActive eq true)
+            }.map { it[ClanMembers.userId] }
+            
+            if (members.isEmpty()) {
+                return@dbTransaction ClanAppUsageAnalytics(
+                    period = period,
+                    periodDate = periodDate,
+                    totalScreenTime = 0L,
+                    categoryBreakdown = emptyList(),
+                    topApps = emptyList(),
+                    memberActivity = emptyList()
+                )
+            }
+            
+            // Calculate date range based on period
+            val (startDate, endDate) = when (period) {
+                "daily" -> {
+                    val date = LocalDate.parse(periodDate, DateTimeFormatter.ofPattern("yyyy-MM-dd"))
+                    Pair(date.atStartOfDay(), date.plusDays(1).atStartOfDay())
+                }
+                "weekly" -> {
+                    val weekFields = WeekFields.of(Locale.getDefault())
+                    val parts = periodDate.split("-W")
+                    val year = parts[0].toInt()
+                    val week = parts[1].toInt()
+                    val date = LocalDate.of(year, 1, 1)
+                    val weekStart = date.with(weekFields.weekOfWeekBasedYear(), week.toLong())
+                        .with(weekFields.dayOfWeek(), 1)
+                    val weekEnd = weekStart.plusDays(6).atTime(23, 59, 59)
+                    Pair(weekStart.atStartOfDay(), weekEnd)
+                }
+                "monthly" -> {
+                    val parts = periodDate.split("-")
+                    val year = parts[0].toInt()
+                    val month = parts[1].toInt()
+                    val monthStart = LocalDate.of(year, month, 1)
+                    val monthEnd = monthStart.withDayOfMonth(monthStart.lengthOfMonth())
+                    Pair(monthStart.atStartOfDay(), monthEnd.atTime(23, 59, 59))
+                }
+                else -> {
+                    val date = LocalDate.now()
+                    Pair(date.atStartOfDay(), date.plusDays(1).atStartOfDay())
+                }
+            }
+            
+            // Convert to kotlinx.datetime.LocalDate for AppStats query
+            // We use the start of the day from java LocalDate
+            val startKotlinDate = kotlinx.datetime.LocalDate.parse(startDate.toLocalDate().toString())
+            val endKotlinDate = kotlinx.datetime.LocalDate.parse(endDate.toLocalDate().toString())
+
+            // Get all app stats for clan members in the period
+            val statsRows = AppStats.select {
+                (AppStats.userId inList members) and
+                (AppStats.date greaterEq startKotlinDate) and
+                (AppStats.date lessEq endKotlinDate)
+            }.toList()
+            
+            val json = Json { ignoreUnknownKeys = true }
+
+            // Aggregate by package/app
+            val appUsageMap = mutableMapOf<String, AppUsageData>()
+            val userAppMap = mutableMapOf<String, MutableSet<String>>() // package -> set of userIds
+            
+            // Member activity map
+            val memberActivityMap = mutableMapOf<String, MemberActivityData>()
+            val memberAppMap = mutableMapOf<String, MutableSet<String>>()
+            val memberCategoryMap = mutableMapOf<String, MutableSet<String?>>()
+            val userSpecificAppUsage = mutableMapOf<String, MutableList<AppStatEntry>>()
+
+            for (row in statsRows) {
+                val userId = row[AppStats.userId]
+                val statsJson = row[AppStats.statsJson]
+                
+                try {
+                    val appStatsList = json.decodeFromString<List<AppStatEntry>>(statsJson)
+                    
+                    // Collect all app stats for this user
+                    if (!userSpecificAppUsage.containsKey(userId)) {
+                        userSpecificAppUsage[userId] = mutableListOf()
+                    }
+                    userSpecificAppUsage[userId]!!.addAll(appStatsList)
+                    
+                    for (appStat in appStatsList) {
+                        val packageName = appStat.packagename
+                        val appName = appStat.appname
+                        val duration = appStat.duration
+                        val category = inferCategory(packageName, appName)
+                        
+                        // Update App Usage Map
+                        val key = packageName
+                        if (!appUsageMap.containsKey(key)) {
+                            appUsageMap[key] = AppUsageData(
+                                packageName = packageName,
+                                appName = appName,
+                                totalTime = 0L,
+                                userCount = 0
+                            )
+                            userAppMap[key] = mutableSetOf()
+                        }
+                        
+                        appUsageMap[key] = appUsageMap[key]!!.copy(
+                            totalTime = appUsageMap[key]!!.totalTime + duration
+                        )
+                        userAppMap[key]!!.add(userId)
+                        
+                        // Update Member Activity Map
+                        if (!memberActivityMap.containsKey(userId)) {
+                            memberActivityMap[userId] = MemberActivityData(
+                                userId = userId,
+                                totalScreenTime = 0L,
+                                appCount = 0,
+                                categoryCount = 0
+                            )
+                            memberAppMap[userId] = mutableSetOf()
+                            memberCategoryMap[userId] = mutableSetOf()
+                        }
+                        
+                        memberActivityMap[userId] = memberActivityMap[userId]!!.copy(
+                            totalScreenTime = memberActivityMap[userId]!!.totalScreenTime + duration
+                        )
+                        memberAppMap[userId]!!.add(packageName)
+                        memberCategoryMap[userId]!!.add(category)
+                    }
+                } catch (e: Exception) {
+                    // Ignore parsing errors
+                    continue
+                }
+            }
+            
+            // Update user counts for apps
+            appUsageMap.forEach { (key, data) ->
+                appUsageMap[key] = data.copy(userCount = userAppMap[key]!!.size)
+            }
+            
+            // Aggregate by category (simple mapping based on package name patterns)
+            val categoryUsageMap = mutableMapOf<String?, CategoryUsageData>()
+            val categoryUserMap = mutableMapOf<String?, MutableSet<String>>()
+            
+            for ((packageName, appData) in appUsageMap) {
+                val category = inferCategory(packageName, appData.appName)
+                
+                if (!categoryUsageMap.containsKey(category)) {
+                    categoryUsageMap[category] = CategoryUsageData(
+                        category = category,
+                        totalTime = 0L,
+                        memberCount = 0
+                    )
+                    categoryUserMap[category] = mutableSetOf()
+                }
+                
+                categoryUsageMap[category] = categoryUsageMap[category]!!.copy(
+                    totalTime = categoryUsageMap[category]!!.totalTime + appData.totalTime
+                )
+                
+                // Add all users who used apps in this category
+                userAppMap[packageName]?.forEach { userId ->
+                    categoryUserMap[category]!!.add(userId)
+                }
+            }
+            
+            // Update member counts for categories
+            categoryUsageMap.forEach { (category, data) ->
+                categoryUsageMap[category] = data.copy(memberCount = categoryUserMap[category]!!.size)
+            }
+            
+            val totalScreenTime = categoryUsageMap.values.sumOf { it.totalTime }
+            
+            // Calculate percentages for categories
+            val categoryBreakdown = categoryUsageMap.values.map { data ->
+                val percentage = if (totalScreenTime > 0) {
+                    (data.totalTime.toDouble() / totalScreenTime.toDouble()) * 100.0
+                } else {
+                    0.0
+                }
+                CategoryUsage(
+                    category = data.category,
+                    totalTime = data.totalTime,
+                    percentage = percentage,
+                    memberCount = data.memberCount
+                )
+            }.sortedByDescending { it.totalTime }
+            
+            // Top apps
+            val topApps = appUsageMap.values
+                .map { data ->
+                    val avgTime = if (data.userCount > 0) {
+                        data.totalTime / data.userCount
+                    } else {
+                        0L
+                    }
+                    TopAppUsage(
+                        packageName = data.packageName,
+                        appName = data.appName,
+                        totalTime = data.totalTime,
+                        userCount = data.userCount,
+                        averageTime = avgTime
+                    )
+                }
+                .sortedByDescending { it.totalTime }
+                .take(5)
+            
+            // Update counts for member activity
+            memberActivityMap.forEach { (userId, data) ->
+                memberActivityMap[userId] = data.copy(
+                    appCount = memberAppMap[userId]!!.size,
+                    categoryCount = memberCategoryMap[userId]!!.size
+                )
+            }
+            
+            // Get usernames
+            val userIds = memberActivityMap.keys.toList()
+            val usernameMap = if (userIds.isNotEmpty()) {
+                Users.select { Users.userId inList userIds }
+                    .associate { it[Users.userId] to it[Users.username] }
+            } else {
+                emptyMap()
+            }
+            
+            val memberActivity = memberActivityMap.values
+                .sortedByDescending { it.totalScreenTime }
+                .mapIndexed { index, data ->
+                    // Calculate top apps for this user
+                    val userApps = userSpecificAppUsage[data.userId] ?: emptyList()
+                    
+                    // Aggregate duplicates (if multiple days selected)
+                    val aggregatedUserApps = userApps
+                        .groupBy { it.packagename }
+                        .map { (pkg, entries) ->
+                            val first = entries.first()
+                            AppStatEntry(
+                                appname = first.appname,
+                                packagename = pkg,
+                                duration = entries.sumOf { it.duration }
+                            )
+                        }
+                        .sortedByDescending { it.duration }
+                        .take(1) // Top 10 apps per user
+                        .map { appStat ->
+                            TopAppUsage(
+                                packageName = appStat.packagename,
+                                appName = appStat.appname,
+                                totalTime = appStat.duration,
+                                userCount = 1,
+                                averageTime = appStat.duration
+                            )
+                        }
+
+                    MemberActivityStats(
+                        userId = data.userId,
+                        username = usernameMap[data.userId],
+                        totalScreenTime = data.totalScreenTime,
+                        appCount = data.appCount,
+                        categoryCount = data.categoryCount,
+                        rank = index + 1,
+                        topApps = aggregatedUserApps
+                    )
+                }
+            
+            ClanAppUsageAnalytics(
+                period = period,
+                periodDate = periodDate,
+                totalScreenTime = totalScreenTime,
+                categoryBreakdown = categoryBreakdown,
+                topApps = topApps,
+                memberActivity = memberActivity
+            )
+        }
+    }
+
+    
+    /**
+     * Infer app category from package name and app name
+     * Simple pattern matching - can be enhanced with a proper category database
+     */
+    private fun inferCategory(packageName: String?, appName: String?): String? {
+        val name = (appName ?: packageName ?: "").lowercase()
+        val packageLower = packageName?.lowercase() ?: ""
+        
+        return when {
+            name.contains("social") || name.contains("instagram") || name.contains("facebook") || 
+            name.contains("twitter") || name.contains("whatsapp") || name.contains("telegram") ||
+            name.contains("snapchat") || name.contains("linkedin") || packageLower.contains("com.facebook") ||
+            packageLower.contains("com.instagram") || packageLower.contains("com.twitter") ||
+            packageLower.contains("com.whatsapp") -> "Social Media"
+            
+            name.contains("game") || name.contains("play") || packageLower.contains("com.game") ||
+            packageLower.contains("com.play") -> "Games"
+            
+            name.contains("video") || name.contains("youtube") || name.contains("netflix") ||
+            name.contains("prime") || name.contains("hotstar") || packageLower.contains("com.youtube") ||
+            packageLower.contains("com.netflix") -> "Video & Entertainment"
+            
+            name.contains("music") || name.contains("spotify") || name.contains("gaana") ||
+            packageLower.contains("com.spotify") -> "Music & Audio"
+            
+            name.contains("book") || name.contains("read") || name.contains("kindle") ||
+            packageLower.contains("com.amazon.kindle") -> "Books & Reading"
+            
+            name.contains("news") || name.contains("times") || name.contains("hindu") ||
+            packageLower.contains("com.news") -> "News & Magazines"
+            
+            name.contains("shop") || name.contains("amazon") || name.contains("flipkart") ||
+            name.contains("myntra") || packageLower.contains("com.amazon") ||
+            packageLower.contains("com.flipkart") -> "Shopping"
+            
+            name.contains("food") || name.contains("zomato") || name.contains("swiggy") ||
+            name.contains("uber") || packageLower.contains("com.zomato") ||
+            packageLower.contains("com.swiggy") -> "Food & Delivery"
+            
+            name.contains("bank") || name.contains("pay") || name.contains("wallet") ||
+            name.contains("upi") || packageLower.contains("com.bank") ||
+            packageLower.contains("com.pay") -> "Finance & Banking"
+            
+            name.contains("health") || name.contains("fitness") || name.contains("workout") ||
+            packageLower.contains("com.health") -> "Health & Fitness"
+            
+            name.contains("education") || name.contains("learn") || name.contains("course") ||
+            packageLower.contains("com.education") -> "Education & Learning"
+            
+            name.contains("travel") || name.contains("booking") || name.contains("makemytrip") ||
+            packageLower.contains("com.travel") -> "Travel & Booking"
+            
+            name.contains("productivity") || name.contains("note") || name.contains("todo") ||
+            name.contains("calendar") || packageLower.contains("com.productivity") -> "Productivity"
+            
+            name.contains("browser") || name.contains("chrome") || name.contains("firefox") ||
+            name.contains("safari") || packageLower.contains("com.chrome") ||
+            packageLower.contains("com.browser") -> "Browsers"
+            
+            name.contains("camera") || name.contains("photo") || name.contains("gallery") ||
+            packageLower.contains("com.camera") -> "Camera & Photos"
+            
+            name.contains("message") || name.contains("sms") || name.contains("messenger") ||
+            packageLower.contains("com.message") -> "Messaging"
+            
+            else -> "Other"
+        }
+    }
+    
+    /**
+     * Data classes for internal use
+     */
+    private data class AppUsageData(
+        val packageName: String,
+        val appName: String?,
+        val totalTime: Long,
+        val userCount: Int
+    )
+    
+    private data class CategoryUsageData(
+        val category: String?,
+        val totalTime: Long,
+        val memberCount: Int
+    )
+    
+    private data class MemberActivityData(
+        val userId: String,
+        val totalScreenTime: Long,
+        val appCount: Int,
+        val categoryCount: Int
+    )
+    
+    /**
+     * Data class for clan app usage analytics (internal)
+     */
+    data class ClanAppUsageAnalytics(
+        val period: String,
+        val periodDate: String,
+        val totalScreenTime: Long,
+        val categoryBreakdown: List<CategoryUsage>,
+        val topApps: List<TopAppUsage>,
+        val memberActivity: List<MemberActivityStats>
+    )
 }
 

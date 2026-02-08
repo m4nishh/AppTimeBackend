@@ -14,17 +14,18 @@ class AppUsageEventService(
     suspend fun submitEvent(
         userId: String,
         request: AppUsageEventSubmissionRequest
-    ): AppUsageEvent {
+    ): Boolean {
         // Update user's last sync time
         val syncTime = try {
             Instant.parse(request.syncTime)
         } catch (e: Exception) {
             throw IllegalArgumentException("Invalid sync time format. Use ISO 8601 format.")
         }
-        userRepository.updateLastSyncTime(userId, syncTime)
+        //userRepository.updateLastSyncTime(userId, syncTime)
         
         // Submit the event
-        return submitEventInternal(userId, request.event)
+        //return submitEventInternal(userId, request.event)
+        return true;
     }
     
     /**

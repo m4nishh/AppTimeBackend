@@ -172,5 +172,28 @@ class AppStatsRepository {
             }
         }
     }
+    /**
+     * Get list of userIds that have stats for a specific date
+     */
+    fun getUsersWithStatsForDate(date: LocalDate): List<String> {
+        return dbTransaction {
+            AppStats.select { AppStats.date eq date }
+                .map { it[AppStats.userId] }
+                .distinct()
+        }
+    }
+    /**
+     * Get total usage duration (in milliseconds) for a user on a specific date
+     */
+    fun getTotalUsageDurationForDate(userId: String, date: LocalDate): Long {
+        return dbTransaction {
+            val record = AppStats.select {
+                (AppStats.userId eq userId) and (AppStats.date eq date)
+            }.firstOrNull() ?: return@dbTransaction 0L
+            
+            val statsList = json.decodeFromString<List<AppStatEntry>>(record[AppStats.statsJson])
+            statsList.sumOf { it.duration }
+        }
+    }
 }
 

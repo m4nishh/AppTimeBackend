@@ -54,8 +54,9 @@ object ClanMembers : LongIdTable("clan_members") {
         .clientDefault { kotlinx.datetime.Clock.System.now() }
     val isActive = bool("is_active").default(true)
     init {
-        // One user can only be active in one clan at a time
-        uniqueIndex(userId, isActive)
+        // Prevent duplicate memberships in the same clan
+        // Users can be members of multiple clans, but only once per clan
+        uniqueIndex(clanId, userId)
 
         index(false, clanId, isActive)
     }
@@ -154,6 +155,47 @@ object ClanJoinRequests : LongIdTable("clan_join_requests") {
     init {
         uniqueIndex(clanId, userId, status)
         index(false, userId, status)
+    }
+}
+
+/**
+ * Clan shares table - tracks clan shares and joins
+ */
+object ClanShares : Table("clan_shares") {
+    val id = long("id").autoIncrement()
+    val clanId = long("clan_id").references(Clans.id, onDelete = ReferenceOption.CASCADE)
+    val sharerUserId = varchar("sharer_user_id", 255).index() // User who shared the clan
+    val shareCode = varchar("share_code", 50).uniqueIndex() // Unique code for tracking this share
+    val clickCount = integer("click_count").default(0) // Number of times the link was clicked
+    val joinCount = integer("join_count").default(0) // Number of successful joins via this share
+    val createdAt = timestamp("created_at").clientDefault { kotlinx.datetime.Clock.System.now() }
+    val updatedAt = timestamp("updated_at").clientDefault { kotlinx.datetime.Clock.System.now() }
+    
+    override val primaryKey = PrimaryKey(id)
+    
+    init {
+        index(false, clanId, sharerUserId)
+    }
+}
+
+/**
+ * Clan share events table - tracks individual events (clicks, joins, app opens)
+ */
+object ClanShareEvents : Table("clan_share_events") {
+    val id = long("id").autoIncrement()
+    val shareId = long("share_id").references(ClanShares.id, onDelete = ReferenceOption.CASCADE)
+    val eventType = varchar("event_type", 50).index() // CLICK, JOIN, APP_OPEN
+    val joinerUserId = varchar("joiner_user_id", 255).nullable().index() // User who joined (if registered)
+    val deviceId = varchar("device_id", 255).nullable() // Device identifier for tracking
+    val userAgent = text("user_agent").nullable() // Browser/device user agent
+    val ipAddress = varchar("ip_address", 50).nullable() // IP address (optional, for analytics)
+    val createdAt = timestamp("created_at").clientDefault { kotlinx.datetime.Clock.System.now() }
+    
+    override val primaryKey = PrimaryKey(id)
+    
+    init {
+        index(false, shareId, eventType)
+        index(false, createdAt)
     }
 }
 

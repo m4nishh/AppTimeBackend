@@ -9,8 +9,10 @@ import users.UserRepository
 import io.ktor.http.*
 import io.ktor.server.application.*
 import io.ktor.server.auth.*
+import io.ktor.server.plugins.*
 import io.ktor.server.request.*
 import io.ktor.server.routing.*
+import java.net.URLEncoder
 
 /**
  * Configure referral-related routes
@@ -48,16 +50,78 @@ fun Application.configureReferralRoutes() {
                 }
                 
                 /**
+                 * GET /api/referrals/share
+                 * Get shareable link for referral code (requires authentication)
+                 * Returns: Share link and deeplink with encrypted token
+                 */
+                get("/share") {
+                    try {
+                        val userId = call.requireUserId()
+                        
+                        // Get or create referral code
+                        val referralCode = referralRepository.ensureUserHasReferralCode(userId)
+                        
+                        // Get base URL from request
+                        val scheme = call.request.origin.scheme
+                        val host = call.request.host()
+                        val port = call.request.port()
+                        val baseUrl = if (port == 80 || port == 443) {
+                            "$scheme://$host"
+                        } else {
+                            "$scheme://$host:$port"
+                        }
+                        
+                        // Encode referral code into a secure token
+                        val token = com.apptime.code.common.TokenEncoder.encodeReferral(referralCode)
+                        val encodedToken = URLEncoder.encode(token, "UTF-8")
+                        
+                        // Use token instead of revealing referral code
+                        val shareLink = "$baseUrl/referral/$encodedToken"
+                        val deeplink = "apptime://screen/referral/$encodedToken"
+                        
+                        val response = ReferralShareLinkResponse(
+                            referralCode = referralCode,
+                            shareLink = shareLink,
+                            deeplink = deeplink
+                        )
+                        
+                        call.respondApi(response, messageKey = MessageKeys.REFERRAL_CODE_RETRIEVED)
+                    } catch (e: Exception) {
+                        call.respondError(
+                            HttpStatusCode.InternalServerError,
+                            messageKey = MessageKeys.REFERRAL_CODE_FAILED,
+                            message = "Failed to get share link: ${e.message}"
+                        )
+                    }
+                }
+                
+                /**
                  * POST /api/referrals/apply
                  * Apply a referral code (for new users during signup/onboarding)
-                 * Request body: { "referralCode": "ABC123XYZ" }
+                 * Request body: { "token": "encoded_token" } OR { "referralCode": "ABC123XYZ" }
                  */
                 post("/apply") {
                     try {
                         val userId = call.requireUserId()
                         val request = call.receive<ApplyReferralCodeRequest>()
                         
-                        val response = service.applyReferralCode(userId, request.referralCode)
+                        // Get referral code from token or direct referralCode
+                        val referralCode = when {
+                            request.referralCode != null -> {
+                                // Explicit referral code provided
+                                request.referralCode
+                            }
+                            request.token != null -> {
+                                // Try to decode token first
+                                com.apptime.code.common.TokenEncoder.decodeReferral(request.token)
+                                    ?: request.token // Fallback: treat token value as referral code (backward compatibility)
+                            }
+                            else -> {
+                                throw IllegalArgumentException("Either token or referralCode must be provided")
+                            }
+                        }
+                        
+                        val response = service.applyReferralCode(userId, referralCode)
                         call.respondApi(
                             response,
                             statusCode = HttpStatusCode.Created,

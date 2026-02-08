@@ -235,3 +235,35 @@ data class ChallengeStatsSyncResponse(
     val usersUpdated: Int
 )
 
+/**
+ * Response for challenge share link
+ */
+@Serializable
+data class ChallengeShareLinkResponse(
+    val challengeId: Long,
+    val shareLink: String,
+    val deeplink: String, // App deeplink format: apptime://screen/challenge_detail/{challengeId}
+    val shareCode: String // Unique code for tracking this share
+)
+
+/**
+ * Request to track share event (install, app_open)
+ */
+@Serializable
+data class TrackShareEventRequest(
+    val shareCode: String? = null, // Optional: can use token instead
+    val token: String? = null, // Optional: encoded token containing challengeId and shareCode
+    val eventType: String, // INSTALL, APP_OPEN
+    val deviceId: String? = null
+)
+
+/**
+ * Response for share statistics
+ */
+@Serializable
+data class ShareStatsResponse(
+    val totalShares: Long,
+    val totalClicks: Int,
+    val totalInstalls: Int
+)
+

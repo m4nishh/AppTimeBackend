@@ -1,13 +1,25 @@
 package com.apptime.code.clans
 
+import com.apptime.code.notifications.NotificationService
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import kotlinx.datetime.Clock
 import kotlinx.datetime.toJavaInstant
+import users.UserRepository
 import kotlin.time.Duration.Companion.days
 
-class ClanService {
-    private val repository = ClanRepository()
+class ClanService(
+    private val notificationService: NotificationService? = null,
+    private val userRepository: UserRepository? = null,
+    private val notificationScope: CoroutineScope? = null
+) {
+    val repository = ClanRepository()
+    private val defaultScope = CoroutineScope(Dispatchers.IO)
+    
+    private fun getNotificationScope() = notificationScope ?: defaultScope
     
     /**
      * Create a new clan
@@ -45,8 +57,21 @@ class ClanService {
             category = request.category
         )
         
-        return repository.getClanById(clanId, creatorId)
+        val clan = repository.getClanById(clanId, creatorId)
             ?: throw IllegalStateException("Failed to create clan")
+        
+        // Send notification to creator
+        notificationService?.let { service ->
+            getNotificationScope().launch {
+                try {
+                    service.sendClanCreatedNotification(creatorId, clanId, request.name)
+                } catch (e: Exception) {
+                    // Log but don't fail the operation
+                }
+            }
+        }
+        
+        return clan
     }
     
     /**
@@ -54,8 +79,8 @@ class ClanService {
      */
     fun updateClan(clanId: Long, userId: String, request: UpdateClanRequest): Clan {
         // Check if user is admin
-        val (clan, member) = repository.getUserClanInfo(userId)
-//        if (clan?.id != clanId) {
+        val (userClan, member) = repository.getUserClanInfo(userId)
+//        if (userClan?.id != clanId) {
 //            throw IllegalStateException("User is not a member of this clan")
 //        }
         if (member?.role !in listOf("ADMIN", "MODERATOR")) {
@@ -84,8 +109,30 @@ class ClanService {
             category = request.category
         )
         
-        return repository.getClanById(clanId, userId)
+        val updatedClan = repository.getClanById(clanId, userId)
             ?: throw IllegalStateException("Failed to update clan")
+        
+        // Send notifications to all members
+        notificationService?.let { service ->
+            getNotificationScope().launch {
+                try {
+                    val members = repository.getClanMembers(clanId)
+                    val memberUserIds = members.map { it.userId }
+                    val updatedByUsername = userRepository?.getUserById(userId)?.username
+                    
+                    service.sendClanUpdatedNotification(
+                        clanId = clanId,
+                        clanName = updatedClan.name,
+                        memberUserIds = memberUserIds,
+                        updatedByUsername = updatedByUsername
+                    )
+                } catch (e: Exception) {
+                    // Log but don't fail the operation
+                }
+            }
+        }
+        
+        return updatedClan
     }
     
     /**
@@ -113,11 +160,20 @@ class ClanService {
         val badges = repository.getClanBadges(clanId)
         val stats = getClanStats(clanId)
         
+        // Get app usage analytics (default to daily)
+        val appUsageAnalytics = try {
+            getClanAppUsageAnalytics(clanId, "daily")
+        } catch (e: Exception) {
+            // If analytics fail, return null instead of breaking the API
+            null
+        }
+        
         return ClanDetailsResponse(
             clan = clan,
             members = members,
             stats = stats,
-            badges = badges
+            badges = badges,
+            appUsageAnalytics = appUsageAnalytics
         )
     }
     
@@ -143,8 +199,11 @@ class ClanService {
         // Get this month
         val monthStr = today.format(DateTimeFormatter.ofPattern("yyyy-MM"))
         
-        // This would require querying ClanStats table
-        // For now, returning basic stats
+        // Query ClanStats table for daily, weekly, and monthly stats
+        val dailyFocusHours = repository.getClanStatsByPeriod(clanId, "daily", todayStr)
+        val weeklyFocusHours = repository.getClanStatsByPeriod(clanId, "weekly", weekStr)
+        val monthlyFocusHours = repository.getClanStatsByPeriod(clanId, "monthly", monthStr)
+        
         val topContributors = members
             .sortedByDescending { it.contributedFocusHours }
             .take(5)
@@ -159,9 +218,9 @@ class ClanService {
         
         return ClanStatsResponse(
             totalFocusHours = clan.totalFocusHours,
-            dailyFocusHours = 0L, // Would need to query ClanStats
-            weeklyFocusHours = 0L, // Would need to query ClanStats
-            monthlyFocusHours = 0L, // Would need to query ClanStats
+            dailyFocusHours = dailyFocusHours,
+            weeklyFocusHours = weeklyFocusHours,
+            monthlyFocusHours = monthlyFocusHours,
             topContributors = topContributors
         )
     }
@@ -219,11 +278,60 @@ class ClanService {
         when (clan.clanType) {
             "PUBLIC" -> {
                 // Anyone can join
-                return repository.joinClan(request.clanId, userId)
+                val member = repository.joinClan(request.clanId, userId)
+                
+                // Send notifications to all members
+                notificationService?.let { service ->
+                    getNotificationScope().launch {
+                        try {
+                            val members = repository.getClanMembers(request.clanId)
+                            val memberUserIds = members.map { it.userId }
+                            val username = userRepository?.getUserById(userId)?.username
+                            
+                            service.sendClanMemberJoinedNotification(
+                                clanId = request.clanId,
+                                clanName = clan.name,
+                                newMemberUsername = username,
+                                newMemberUserId = userId,
+                                memberUserIds = memberUserIds
+                            )
+                        } catch (e: Exception) {
+                            // Log but don't fail the operation
+                        }
+                    }
+                }
+                
+                return member
             }
             "PRIVATE" -> {
                 // Requires approval - create join request
                 repository.createJoinRequest(request.clanId, userId, request.message)
+                
+                // Send notifications to admins and moderators
+                notificationService?.let { service ->
+                    getNotificationScope().launch {
+                        try {
+                            val members = repository.getClanMembers(request.clanId)
+                            val adminAndModeratorUserIds = members
+                                .filter { it.role in listOf("ADMIN", "MODERATOR") }
+                                .map { it.userId }
+                            
+                            if (adminAndModeratorUserIds.isNotEmpty()) {
+                                val username = userRepository?.getUserById(userId)?.username
+                                service.sendClanJoinRequestNotification(
+                                    clanId = request.clanId,
+                                    clanName = clan.name,
+                                    requesterUsername = username,
+                                    requesterUserId = userId,
+                                    adminAndModeratorUserIds = adminAndModeratorUserIds
+                                )
+                            }
+                        } catch (e: Exception) {
+                            // Log but don't fail the operation
+                        }
+                    }
+                }
+                
                 throw IllegalStateException("Join request created. Waiting for approval from clan admins.")
             }
             "INVITE_ONLY" -> {
@@ -239,7 +347,31 @@ class ClanService {
      * Leave a clan
      */
     fun leaveClan(userId: String, clanId: Long) {
+        val clan = repository.getClanById(clanId, userId)
+            ?: throw IllegalStateException("Clan not found")
+        
         repository.leaveClan(clanId, userId)
+        
+        // Send notifications to remaining members
+        notificationService?.let { service ->
+            getNotificationScope().launch {
+                try {
+                    val members = repository.getClanMembers(clanId)
+                    val memberUserIds = members.map { it.userId }
+                    val username = userRepository?.getUserById(userId)?.username
+                    
+                    service.sendClanMemberLeftNotification(
+                        clanId = clanId,
+                        clanName = clan.name,
+                        leftMemberUsername = username,
+                        leftMemberUserId = userId,
+                        memberUserIds = memberUserIds
+                    )
+                } catch (e: Exception) {
+                    // Log but don't fail the operation
+                }
+            }
+        }
     }
     
     /**
@@ -247,8 +379,8 @@ class ClanService {
      */
     fun updateMemberRole(clanId: Long, adminUserId: String, request: UpdateMemberRoleRequest) {
         // Check if user is admin
-        val (clan, member) = repository.getUserClanInfo(adminUserId)
-//        if (clan?.id != clanId) {
+        val (userClan, member) = repository.getUserClanInfo(adminUserId)
+//        if (userClan?.id != clanId) {
 //            throw IllegalStateException("User is not a member of this clan")
 //        }
         if (member?.role != "ADMIN") {
@@ -270,6 +402,28 @@ class ClanService {
         }
         
         repository.updateMemberRole(clanId, request.userId, request.role)
+        
+        // Send notification to the user whose role changed
+        notificationService?.let { service ->
+            getNotificationScope().launch {
+                try {
+                    val clan = repository.getClanById(clanId)
+                    val adminUsername = userRepository?.getUserById(adminUserId)?.username
+                    
+                    if (clan != null) {
+                        service.sendClanRoleChangedNotification(
+                            userId = request.userId,
+                            clanId = clanId,
+                            clanName = clan.name,
+                            newRole = request.role,
+                            changedByUsername = adminUsername
+                        )
+                    }
+                } catch (e: Exception) {
+                    // Log but don't fail the operation
+                }
+            }
+        }
     }
     
     /**
@@ -277,8 +431,8 @@ class ClanService {
      */
     fun removeMember(clanId: Long, adminUserId: String, request: RemoveMemberRequest) {
         // Check if user is admin or moderator
-        val (clan, member) = repository.getUserClanInfo(adminUserId)
-//        if (clan?.id != clanId) {
+        val (userClan, member) = repository.getUserClanInfo(adminUserId)
+//        if (userClan?.id != clanId) {
 //            throw IllegalStateException("User is not a member of this clan")
 //        }
         if (member?.role !in listOf("ADMIN", "MODERATOR")) {
@@ -291,11 +445,33 @@ class ClanService {
         }
         
         // Cannot remove the creator
-//        if (clan.creatorId == request.userId) {
+//        if (userClan?.creatorId == request.userId) {
 //            throw IllegalStateException("Cannot remove the clan creator")
 //        }
         
+        val clan = repository.getClanById(clanId, adminUserId)
+            ?: throw IllegalStateException("Clan not found")
+        
         repository.removeMember(clanId, request.userId)
+        
+        // Send notification to removed member
+        notificationService?.let { service ->
+            getNotificationScope().launch {
+                try {
+                    val adminUsername = userRepository?.getUserById(adminUserId)?.username
+                    
+                    service.sendClanMemberRemovedNotification(
+                        userId = request.userId,
+                        clanId = clanId,
+                        clanName = clan.name,
+                        removedByUsername = adminUsername,
+                        reason = request.reason
+                    )
+                } catch (e: Exception) {
+                    // Log but don't fail the operation
+                }
+            }
+        }
     }
     
     /**
@@ -303,8 +479,8 @@ class ClanService {
      */
     fun createInvite(clanId: Long, userId: String, request: CreateInviteRequest): ClanInvite {
         // Check if user is admin or moderator
-        val (clan, member) = repository.getUserClanInfo(userId)
-//        if (clan?.id != clanId) {
+        val (userClan, member) = repository.getUserClanInfo(userId)
+//        if (userClan?.id != clanId) {
 //            throw IllegalStateException("User is not a member of this clan")
 //        }
         if (member?.role !in listOf("ADMIN", "MODERATOR")) {
@@ -318,20 +494,72 @@ class ClanService {
             null
         }
         
-        return repository.createInvite(
+        val invite = repository.createInvite(
             clanId = clanId,
             inviterId = userId,
             inviteeUserId = request.inviteeUserId,
             maxUses = request.maxUses,
             expiresAt = expiresAt
         )
+        
+        // Send notification to invitee if specified
+        if (request.inviteeUserId != null) {
+            notificationService?.let { service ->
+                getNotificationScope().launch {
+                    try {
+                        val clan = repository.getClanById(clanId)
+                        val inviterUsername = userRepository?.getUserById(userId)?.username
+                        
+                        if (clan != null) {
+                            service.sendClanInviteReceivedNotification(
+                                userId = request.inviteeUserId,
+                                clanId = clanId,
+                                clanName = clan.name,
+                                inviterUsername = inviterUsername,
+                                inviteCode = invite.inviteCode
+                            )
+                        }
+                    } catch (e: Exception) {
+                        // Log but don't fail the operation
+                    }
+                }
+            }
+        }
+        
+        return invite
     }
     
     /**
      * Accept invite
      */
     fun acceptInvite(userId: String, inviteCode: String): ClanMember {
-        return repository.acceptInvite(inviteCode, userId)
+        val member = repository.acceptInvite(inviteCode, userId)
+        
+        // Send notifications to all members
+        notificationService?.let { service ->
+            getNotificationScope().launch {
+                try {
+                    val members = repository.getClanMembers(member.clanId)
+                    val memberUserIds = members.map { it.userId }
+                    val clan = repository.getClanById(member.clanId)
+                    val username = userRepository?.getUserById(userId)?.username
+                    
+                    if (clan != null) {
+                        service.sendClanMemberJoinedNotification(
+                            clanId = member.clanId,
+                            clanName = clan.name,
+                            newMemberUsername = username,
+                            newMemberUserId = userId,
+                            memberUserIds = memberUserIds
+                        )
+                    }
+                } catch (e: Exception) {
+                    // Log but don't fail the operation
+                }
+            }
+        }
+        
+        return member
     }
     
     /**
@@ -360,15 +588,53 @@ class ClanService {
         request: ReviewJoinRequestRequest
     ): ClanMember? {
         // Check if user is admin or moderator
-        val (clan, member) = repository.getUserClanInfo(userId)
-//        if (clan?.id != clanId) {
+        val (userClan, member) = repository.getUserClanInfo(userId)
+//        if (userClan?.id != clanId) {
 //            throw IllegalStateException("User is not a member of this clan")
 //        }
         if (member?.role !in listOf("ADMIN", "MODERATOR")) {
             throw IllegalStateException("User does not have permission to review join requests")
         }
         
-        return repository.reviewJoinRequest(requestId, userId, request.approved)
+        // Get join request details before reviewing (to get requester userId)
+        val joinRequest = repository.getJoinRequestById(requestId)
+            ?: throw IllegalStateException("Join request not found")
+        
+        val result = repository.reviewJoinRequest(requestId, userId, request.approved)
+        
+        // Send notification to requester
+        notificationService?.let { service ->
+            getNotificationScope().launch {
+                try {
+                    val requesterUserId = result?.userId ?: joinRequest.userId
+                    val clan = repository.getClanById(clanId)
+                    val reviewerUsername = userRepository?.getUserById(userId)?.username
+                    
+                    if (clan != null) {
+                        if (request.approved) {
+                            service.sendClanJoinRequestApprovedNotification(
+                                userId = requesterUserId,
+                                clanId = clanId,
+                                clanName = clan.name,
+                                approvedByUsername = reviewerUsername
+                            )
+                        } else {
+                            service.sendClanJoinRequestRejectedNotification(
+                                userId = requesterUserId,
+                                clanId = clanId,
+                                clanName = clan.name,
+                                rejectedByUsername = reviewerUsername,
+                                reason = request.reason
+                            )
+                        }
+                    }
+                } catch (e: Exception) {
+                    // Log but don't fail the operation
+                }
+            }
+        }
+        
+        return result
     }
     
     /**
@@ -490,6 +756,77 @@ class ClanService {
 //                }
             }
         }
+    }
+    
+    /**
+     * Get or create a share link for a clan
+     * Returns a shareable link with tracking code
+     */
+    fun getShareLink(clanId: Long, userId: String, baseUrl: String): ClanShareLinkResponse {
+        // Check if user is a member of the clan
+        val (userClan, member) = repository.getUserClanInfo(userId)
+        if (userClan == null || member == null) {
+            throw IllegalStateException("User is not a member of this clan")
+        }
+        
+        // Validate clan exists
+        val clan = repository.getClanById(clanId)
+            ?: throw IllegalStateException("Clan not found")
+        
+        // Create or get share record
+        val shareCode = repository.createOrGetClanShare(clanId, userId)
+        
+        // Encode clan ID and share code into a secure token
+        val token = com.apptime.code.common.TokenEncoder.encodeClanShare(clanId, shareCode)
+        val encodedToken = java.net.URLEncoder.encode(token, "UTF-8")
+        
+        // Use token instead of revealing clan ID and share code
+        val shareLink = "$baseUrl/clan/$encodedToken"
+        val deeplink = "apptime://screen/clan_detail/$encodedToken"
+        
+        return ClanShareLinkResponse(
+            clanId = clanId,
+            shareLink = shareLink,
+            deeplink = deeplink,
+            shareCode = shareCode
+        )
+    }
+    
+    /**
+     * Get clan app usage analytics
+     * Returns category-wise breakdown, top apps, and member activity
+     */
+    fun getClanAppUsageAnalytics(
+        clanId: Long,
+        period: String = "daily" // "daily", "weekly", "monthly"
+    ): ClanAppUsageAnalyticsResponse {
+        val clan = repository.getClanById(clanId)
+            ?: throw IllegalStateException("Clan not found")
+        
+        // Get period date based on period type
+        val today = LocalDate.now()
+        val periodDate = when (period) {
+            "daily" -> today.format(DateTimeFormatter.ofPattern("yyyy-MM-dd"))
+            "weekly" -> {
+                val weekFields = java.time.temporal.WeekFields.of(java.util.Locale.getDefault())
+                val week = today.get(weekFields.weekOfWeekBasedYear())
+                val year = today.get(weekFields.weekBasedYear())
+                "${year}-W${String.format("%02d", week)}"
+            }
+            "monthly" -> today.format(DateTimeFormatter.ofPattern("yyyy-MM"))
+            else -> today.format(DateTimeFormatter.ofPattern("yyyy-MM-dd"))
+        }
+        
+        val analytics = repository.getClanAppUsageAnalytics(clanId, period, periodDate)
+        
+        return ClanAppUsageAnalyticsResponse(
+            period = analytics.period,
+            periodDate = analytics.periodDate,
+            totalScreenTime = analytics.totalScreenTime,
+            categoryBreakdown = analytics.categoryBreakdown,
+            topApps = analytics.topApps,
+            memberActivity = analytics.memberActivity
+        )
     }
     
     /**

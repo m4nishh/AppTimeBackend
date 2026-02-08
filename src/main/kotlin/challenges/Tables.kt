@@ -77,3 +77,44 @@ object ChallengeParticipantStats : Table("challenge_participant_stats") {
     }
 }
 
+/**
+ * Challenge shares table - tracks challenge shares and installations
+ */
+object ChallengeShares : Table("challenge_shares") {
+    val id = long("id").autoIncrement()
+    val challengeId = long("challenge_id").references(Challenges.id, onDelete = org.jetbrains.exposed.sql.ReferenceOption.CASCADE)
+    val sharerUserId = varchar("sharer_user_id", 255).index() // User who shared the challenge
+    val shareCode = varchar("share_code", 50).uniqueIndex() // Unique code for tracking this share
+    val clickCount = integer("click_count").default(0) // Number of times the link was clicked
+    val installCount = integer("install_count").default(0) // Number of successful installations
+    val createdAt = timestamp("created_at").clientDefault { kotlinx.datetime.Clock.System.now() }
+    val updatedAt = timestamp("updated_at").clientDefault { kotlinx.datetime.Clock.System.now() }
+    
+    override val primaryKey = PrimaryKey(id)
+    
+    init {
+        index(isUnique = false, challengeId, sharerUserId)
+    }
+}
+
+/**
+ * Challenge share events table - tracks individual events (clicks, installs, app opens)
+ */
+object ChallengeShareEvents : Table("challenge_share_events") {
+    val id = long("id").autoIncrement()
+    val shareId = long("share_id").references(ChallengeShares.id, onDelete = org.jetbrains.exposed.sql.ReferenceOption.CASCADE)
+    val eventType = varchar("event_type", 50).index() // CLICK, INSTALL, APP_OPEN, PLAY_STORE_REDIRECT
+    val installerUserId = varchar("installer_user_id", 255).nullable().index() // User who installed (if registered)
+    val deviceId = varchar("device_id", 255).nullable() // Device identifier for tracking
+    val userAgent = text("user_agent").nullable() // Browser/device user agent
+    val ipAddress = varchar("ip_address", 50).nullable() // IP address (optional, for analytics)
+    val createdAt = timestamp("created_at").clientDefault { kotlinx.datetime.Clock.System.now() }
+    
+    override val primaryKey = PrimaryKey(id)
+    
+    init {
+        index(isUnique = false, shareId, eventType)
+        index(isUnique = false, createdAt)
+    }
+}
+

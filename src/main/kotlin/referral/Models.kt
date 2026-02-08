@@ -47,7 +47,18 @@ data class Referral(
  */
 @Serializable
 data class ApplyReferralCodeRequest(
-    val referralCode: String
+    val referralCode: String? = null, // Optional: can use token instead
+    val token: String? = null // Optional: encoded token containing referral code
+)
+
+/**
+ * Response for referral share link
+ */
+@Serializable
+data class ReferralShareLinkResponse(
+    val referralCode: String,
+    val shareLink: String,
+    val deeplink: String // App deeplink format: apptime://screen/referral/{token}
 )
 
 /**

@@ -1,25 +1,19 @@
+import com.apptime.code.appstats.AppStats
 import com.apptime.code.blockeddomains.BlockedDomainGroups
 import com.apptime.code.blockeddomains.BlockedDomains
 import com.apptime.code.challenges.ChallengeParticipantStats
 import com.apptime.code.challenges.ChallengeParticipants
 import com.apptime.code.challenges.ChallengeSeedData
 import com.apptime.code.challenges.Challenges
-import com.apptime.code.clans.Clans
-import com.apptime.code.clans.ClanMembers
-import com.apptime.code.clans.ClanStats
-import com.apptime.code.clans.ClanInvites
-import com.apptime.code.clans.ClanBadges
-import com.apptime.code.clans.ClanJoinRequests
+import com.apptime.code.clans.*
 import com.apptime.code.common.EnvLoader
 import com.apptime.code.consents.ConsentSeedData
 import com.apptime.code.consents.ConsentTemplates
 import com.apptime.code.consents.UserConsents
-import feedback.Feedback
 import com.apptime.code.features.FeatureFlags
-import com.apptime.code.focus.FocusSessions
 import com.apptime.code.focus.FocusModeStats
+import com.apptime.code.focus.FocusSessions
 import com.apptime.code.leaderboard.LeaderboardStats
-import com.apptime.code.appstats.AppStats
 import com.apptime.code.location.UserLocations
 import com.apptime.code.notifications.Notifications
 import com.apptime.code.referral.Referrals
@@ -29,15 +23,16 @@ import com.apptime.code.rewards.RewardCatalog
 import com.apptime.code.rewards.Rewards
 import com.apptime.code.rewards.Transactions
 import com.apptime.code.users.Users
-import users.TOTPVerificationSessions
 import com.zaxxer.hikari.HikariConfig
 import com.zaxxer.hikari.HikariDataSource
-import org.jetbrains.exposed.sql.Database
-import org.jetbrains.exposed.sql.DatabaseConfig
-import org.jetbrains.exposed.sql.SchemaUtils
+import feedback.Feedback
+import org.jetbrains.exposed.sql.*
+import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
+import org.jetbrains.exposed.sql.SqlExpressionBuilder.greater
 import org.jetbrains.exposed.sql.transactions.transaction
 import urlsearch.UrlSearches
 import usage.AppUsageEvents
+import users.TOTPVerificationSessions
 
 object DatabaseFactory {
     fun init() {
@@ -134,7 +129,86 @@ object DatabaseFactory {
 
     private fun createTables() {
         transaction {
-            SchemaUtils.createMissingTablesAndColumns(
+            // Migration: Drop old constraint if it exists and add new one
+            try {
+                // Check if old constraint exists and drop it
+                exec("""
+                    DO $$ 
+                    BEGIN
+                        IF EXISTS (
+                            SELECT 1 FROM pg_constraint 
+                            WHERE conname = 'clan_members_user_id_is_active_unique'
+                        ) THEN
+                            ALTER TABLE clan_members 
+                            DROP CONSTRAINT clan_members_user_id_is_active_unique;
+                            RAISE NOTICE 'Dropped old constraint clan_members_user_id_is_active_unique';
+                        END IF;
+                    END $$;
+                """.trimIndent())
+                println("✅ Checked and dropped old constraint if it existed")
+            } catch (e: Exception) {
+                // If constraint doesn't exist or table doesn't exist, that's okay
+                if (e.message?.contains("does not exist") == false && 
+                    e.message?.contains("relation") == false &&
+                    e.message?.contains("clan_members") == false) {
+                    println("ℹ️  Could not drop old constraint: ${e.message}")
+                }
+            }
+            
+            // Clean up duplicate clan memberships before creating constraints
+            // Users can be members of multiple clans, but only once per clan
+            // The constraint requires (clan_id, user_id) to be unique
+            try {
+                // Get all memberships and group by (clanId, userId) to find duplicates
+                val allMemberships = ClanMembers.selectAll().map { row ->
+                    Triple(row[ClanMembers.id], row[ClanMembers.clanId], row[ClanMembers.userId])
+                }
+                
+                // Group by (clanId, userId) to find duplicates
+                val grouped = allMemberships.groupBy { (_, clanId, userId) -> 
+                    clanId to userId 
+                }
+                
+                var cleanedCount = 0
+                
+                // Clean up duplicate memberships in the same clan (keep oldest active, or oldest if all inactive)
+                for ((clanId, userId) in grouped.keys) {
+                    val memberships = grouped[clanId to userId] ?: continue
+                    if (memberships.size > 1) {
+                        // Get full membership records to check isActive and joinedAt
+                        val fullMemberships = ClanMembers.select {
+                            (ClanMembers.clanId eq clanId) and (ClanMembers.userId eq userId)
+                        }
+                            .orderBy(ClanMembers.isActive to SortOrder.DESC, ClanMembers.joinedAt to SortOrder.ASC)
+                            .toList()
+                        
+                        // Keep the first (oldest active, or oldest if all inactive), delete the rest
+                        val toDelete = fullMemberships.drop(1)
+                        for (membership in toDelete) {
+                            val membershipId = membership[ClanMembers.id]
+                            ClanMembers.deleteWhere { ClanMembers.id eq membershipId }
+                            cleanedCount++
+                            println("   Deleted duplicate membership for user $userId in clan $clanId")
+                        }
+                    }
+                }
+                
+                if (cleanedCount > 0) {
+                    println("✅ Cleaned up $cleanedCount duplicate clan memberships!")
+                }
+            } catch (e: Exception) {
+                // If table doesn't exist yet or query fails, that's okay - constraint will be created fresh
+                // This is expected on first run when the table doesn't exist yet
+                if (e.message?.contains("does not exist") == false && 
+                    e.message?.contains("relation") == false) {
+                    println("ℹ️  Could not check for duplicates: ${e.message}")
+                }
+            }
+            
+            // Try to create/update tables and constraints
+            // If it fails due to duplicate constraint, clean up and retry once
+            try {
+                SchemaUtils.createMissingTablesAndColumns(
                 // Users module
                 Users,
                 TOTPVerificationSessions,
@@ -170,6 +244,8 @@ object DatabaseFactory {
                 Challenges,
                 ChallengeParticipants,
                 ChallengeParticipantStats,
+                com.apptime.code.challenges.ChallengeShares,
+                com.apptime.code.challenges.ChallengeShareEvents,
                 
                 // Rewards module
                 Rewards,
@@ -188,6 +264,8 @@ object DatabaseFactory {
                 ClanInvites,
                 ClanBadges,
                 ClanJoinRequests,
+                ClanShares,
+                ClanShareEvents,
                 
                 // Features module
                 FeatureFlags,
@@ -197,7 +275,73 @@ object DatabaseFactory {
                 
                 // Feedback module
                 Feedback
-            )
+                )
+            } catch (e: Exception) {
+                // If constraint creation fails due to duplicates, we need to clean up in a new transaction
+                // because the current transaction is aborted
+                if (e.message?.contains("duplicated") == true || 
+                    e.message?.contains("unique") == true ||
+                    e.cause?.message?.contains("duplicated") == true) {
+                    println("⚠️  Constraint creation failed due to duplicates. Cleaning up in new transaction...")
+                    
+                    // Clean up duplicates in a new transaction
+                    try {
+                        transaction {
+                            // Get all memberships and group by (clanId, userId) to find duplicates
+                            val allMemberships = ClanMembers.selectAll().map { row ->
+                                Triple(row[ClanMembers.id], row[ClanMembers.clanId], row[ClanMembers.userId])
+                            }
+                            
+                            // Group by (clanId, userId) to find duplicates
+                            val grouped = allMemberships.groupBy { (_, clanId, userId) -> 
+                                clanId to userId 
+                            }
+                            
+                            // Clean up duplicate memberships in the same clan
+                            for ((clanId, userId) in grouped.keys) {
+                                val memberships = grouped[clanId to userId] ?: continue
+                                if (memberships.size > 1) {
+                                    // Get full membership records to check isActive and joinedAt
+                                    val fullMemberships = ClanMembers.select {
+                                        (ClanMembers.clanId eq clanId) and (ClanMembers.userId eq userId)
+                                    }
+                                        .orderBy(ClanMembers.isActive to SortOrder.DESC, ClanMembers.joinedAt to SortOrder.ASC)
+                                        .toList()
+                                    
+                                    // Keep the first (oldest active, or oldest if all inactive), delete the rest
+                                    val toDelete = fullMemberships.drop(1)
+                                    for (membership in toDelete) {
+                                        val membershipId = membership[ClanMembers.id]
+                                        ClanMembers.deleteWhere { ClanMembers.id eq membershipId }
+                                    }
+                                }
+                            }
+                            
+                            println("✅ Cleaned up duplicates. Retrying constraint creation...")
+                        }
+                        
+                        // Retry creating tables/constraints in a new transaction
+                        transaction {
+                            SchemaUtils.createMissingTablesAndColumns(
+                                Users, TOTPVerificationSessions, UserLocations, AppUsageEvents,
+                                FocusSessions, FocusModeStats, UrlSearches, BlockedDomainGroups,
+                                BlockedDomains, Notifications, ConsentTemplates, UserConsents,
+                                LeaderboardStats, Challenges, ChallengeParticipants, ChallengeParticipantStats,
+                                Rewards, Coins, RewardCatalog, Transactions, UserReferralCodes, Referrals,
+                                Clans, ClanMembers, ClanStats, ClanInvites, ClanBadges, ClanJoinRequests,
+                                ClanShares, ClanShareEvents,
+                                FeatureFlags, AppStats, Feedback
+                            )
+                        }
+                    } catch (retryException: Exception) {
+                        println("❌ Retry failed: ${retryException.message}")
+                        throw e // Throw original exception
+                    }
+                } else {
+                    // Re-throw if it's a different error
+                    throw e
+                }
+            }
         }
         println("✅ Database tables created/verified!")
     }

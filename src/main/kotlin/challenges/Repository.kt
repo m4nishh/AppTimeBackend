@@ -6,10 +6,10 @@ import org.jetbrains.exposed.sql.*
 import kotlinx.datetime.Clock
 import kotlinx.datetime.Instant
 import kotlinx.serialization.json.Json
-import kotlinx.serialization.decodeFromString
 import usage.AppUsageEvents
 import java.time.LocalDate
 import java.time.ZoneId
+import java.security.SecureRandom
 
 class ChallengeRepository {
     
@@ -754,5 +754,166 @@ class ChallengeRepository {
             )
         }
     }
+    
+    /**
+     * Generate a unique share code for challenge sharing
+     */
+    private fun generateShareCode(): String {
+        val random = SecureRandom()
+        val chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789" // Exclude confusing characters
+        return (1..8).map { chars[random.nextInt(chars.length)] }.joinToString("")
+    }
+    
+    /**
+     * Create or get existing challenge share record
+     * Returns the share code for tracking
+     */
+    fun createOrGetChallengeShare(challengeId: Long, sharerUserId: String): String {
+        return dbTransaction {
+            // Check if user already shared this challenge
+            val existingShare = ChallengeShares.select {
+                (ChallengeShares.challengeId eq challengeId) and
+                (ChallengeShares.sharerUserId eq sharerUserId)
+            }.firstOrNull()
+            
+            if (existingShare != null) {
+                return@dbTransaction existingShare[ChallengeShares.shareCode]
+            }
+            
+            // Generate unique share code
+            var shareCode = generateShareCode()
+            var attempts = 0
+            while (ChallengeShares.select { ChallengeShares.shareCode eq shareCode }.count() > 0 && attempts < 10) {
+                shareCode = generateShareCode()
+                attempts++
+            }
+            
+            if (attempts >= 10) {
+                throw IllegalStateException("Failed to generate unique share code")
+            }
+            
+            // Create new share record
+            ChallengeShares.insert {
+                it[ChallengeShares.challengeId] = challengeId
+                it[ChallengeShares.sharerUserId] = sharerUserId
+                it[ChallengeShares.shareCode] = shareCode
+                it[ChallengeShares.clickCount] = 0
+                it[ChallengeShares.installCount] = 0
+            }
+            
+            shareCode
+        }
+    }
+    
+    /**
+     * Get share record by share code
+     */
+    fun getShareByCode(shareCode: String): ChallengeShare? {
+        return dbTransaction {
+            ChallengeShares.select { ChallengeShares.shareCode eq shareCode }
+                .firstOrNull()
+                ?.let { row ->
+                    ChallengeShare(
+                        id = row[ChallengeShares.id],
+                        challengeId = row[ChallengeShares.challengeId],
+                        sharerUserId = row[ChallengeShares.sharerUserId],
+                        shareCode = row[ChallengeShares.shareCode],
+                        clickCount = row[ChallengeShares.clickCount],
+                        installCount = row[ChallengeShares.installCount],
+                        createdAt = row[ChallengeShares.createdAt].toString(),
+                        updatedAt = row[ChallengeShares.updatedAt].toString()
+                    )
+                }
+        }
+    }
+    
+    /**
+     * Track a share event (click, install, app_open, etc.)
+     */
+    fun trackShareEvent(
+        shareCode: String,
+        eventType: String,
+        installerUserId: String? = null,
+        deviceId: String? = null,
+        userAgent: String? = null,
+        ipAddress: String? = null
+    ) {
+        dbTransaction {
+            val share = ChallengeShares.select { ChallengeShares.shareCode eq shareCode }.firstOrNull()
+                ?: throw IllegalArgumentException("Invalid share code")
+            
+            val shareId = share[ChallengeShares.id]
+            
+            // Insert event
+            ChallengeShareEvents.insert {
+                it[ChallengeShareEvents.shareId] = shareId
+                it[ChallengeShareEvents.eventType] = eventType
+                it[ChallengeShareEvents.installerUserId] = installerUserId
+                it[ChallengeShareEvents.deviceId] = deviceId
+                it[ChallengeShareEvents.userAgent] = userAgent
+                it[ChallengeShareEvents.ipAddress] = ipAddress
+            }
+            
+            // Update counters
+            when (eventType) {
+                "CLICK" -> {
+                    ChallengeShares.update({ ChallengeShares.id eq shareId }) {
+                        it[ChallengeShares.clickCount] = share[ChallengeShares.clickCount] + 1
+                        it[ChallengeShares.updatedAt] = Clock.System.now()
+                    }
+                }
+                "INSTALL", "APP_OPEN" -> {
+                    ChallengeShares.update({ ChallengeShares.id eq shareId }) {
+                        it[ChallengeShares.installCount] = share[ChallengeShares.installCount] + 1
+                        it[ChallengeShares.updatedAt] = Clock.System.now()
+                    }
+                }
+
+                else -> {}
+            }
+        }
+    }
+    
+    /**
+     * Get share statistics for a user
+     */
+    fun getUserShareStats(userId: String): ShareStats {
+        return dbTransaction {
+            val shares = ChallengeShares.select { ChallengeShares.sharerUserId eq userId }
+            
+            val totalShares = shares.count()
+            val totalClicks = shares.sumOf { it[ChallengeShares.clickCount] }
+            val totalInstalls = shares.sumOf { it[ChallengeShares.installCount] }
+            
+            ShareStats(
+                totalShares = totalShares,
+                totalClicks = totalClicks,
+                totalInstalls = totalInstalls
+            )
+        }
+    }
+    
+    /**
+     * Data class for challenge share
+     */
+    data class ChallengeShare(
+        val id: Long,
+        val challengeId: Long,
+        val sharerUserId: String,
+        val shareCode: String,
+        val clickCount: Int,
+        val installCount: Int,
+        val createdAt: String,
+        val updatedAt: String
+    )
+    
+    /**
+     * Data class for share statistics
+     */
+    data class ShareStats(
+        val totalShares: Long,
+        val totalClicks: Int,
+        val totalInstalls: Int
+    )
 }
 
