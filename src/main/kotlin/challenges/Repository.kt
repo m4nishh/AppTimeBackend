@@ -194,6 +194,7 @@ class ChallengeRepository {
                     joinedAt = row[ChallengeParticipants.joinedAt].toString(),
                     isPast = endTime < now,
                     packageNames = row[Challenges.packageNames],
+                    variant = row[Challenges.variant],
                     lastSyncTime = lastSyncTimes[challengeId]
                 )
             }
