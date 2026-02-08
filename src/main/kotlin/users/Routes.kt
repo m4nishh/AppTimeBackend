@@ -183,6 +183,8 @@ fun Application.configureUserRoutes() {
                             username = profile.username,
                             email = profile.email,
                             name = profile.name,
+                            country = profile.country,
+                            referralCode = profile.referralCode,
                             createdAt = profile.createdAt,
                             updatedAt = profile.updatedAt,
                             lastSyncTime = profile.lastSyncTime

@@ -1135,9 +1135,30 @@ class ClanRepository {
      */
     fun createJoinRequest(clanId: Long, userId: String, message: String?): ClanJoinRequest {
         return dbTransaction {
+
             val username = Users.select { Users.userId eq userId }
                 .firstOrNull()
                 ?.get(Users.username)
+            
+            // Check for existing pending request
+            val existingRequest = ClanJoinRequests.select {
+                (ClanJoinRequests.clanId eq clanId) and
+                (ClanJoinRequests.userId eq userId) and
+                (ClanJoinRequests.status eq "PENDING")
+            }.firstOrNull()
+            
+            if (existingRequest != null) {
+                return@dbTransaction ClanJoinRequest(
+                    clanId = existingRequest[ClanJoinRequests.clanId],
+                    userId = existingRequest[ClanJoinRequests.userId],
+                    username = existingRequest[ClanJoinRequests.username],
+                    message = existingRequest[ClanJoinRequests.message],
+                    status = existingRequest[ClanJoinRequests.status],
+                    reviewedBy = existingRequest[ClanJoinRequests.reviewedBy],
+                    reviewedAt = existingRequest[ClanJoinRequests.reviewedAt]?.toString(),
+                    createdAt = existingRequest[ClanJoinRequests.createdAt].toString()
+                )
+            }
             
             val requestId = ClanJoinRequests.insertAndGetId {
                 it[ClanJoinRequests.clanId] = clanId

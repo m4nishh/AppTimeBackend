@@ -489,6 +489,7 @@ fun Application.configureClanRoutes(
                                 "$scheme://$host:$port"
                             }
                             
+
                             val shareLink = clanService.getShareLink(clanId, userId, baseUrl)
                             call.respond(HttpStatusCode.OK, SuccessResponse("Share link retrieved successfully", shareLink))
                         } catch (e: IllegalArgumentException) {
@@ -499,6 +500,40 @@ fun Application.configureClanRoutes(
                             call.respond(
                                 HttpStatusCode.InternalServerError,
                                 ErrorResponse("Failed to get share link: ${e.message}")
+                            )
+                        }
+                    }
+
+                    /**
+                     * GET /api/clans/{clanId}/invite-link
+                     * Get permanent invite link for a clan (Admin/Moderator only)
+                     */
+                    get("/{clanId}/invite-link") {
+                        try {
+                            val userId = call.userId.toString()
+                            val clanId = call.parameters["clanId"]?.toLongOrNull()
+                                ?: throw IllegalArgumentException("Invalid clan ID")
+                            
+                            // Get base URL from request
+                            val scheme = call.request.origin.scheme
+                            val host = call.request.host()
+                            val port = call.request.port()
+                            val baseUrl = if (port == 80 || port == 443) {
+                                "$scheme://$host"
+                            } else {
+                                "$scheme://$host:$port"
+                            }
+                            
+                            val response = clanService.getPermanentInviteLink(clanId, userId, baseUrl)
+                            call.respond(HttpStatusCode.OK, SuccessResponse("Invite link retrieved successfully", response))
+                        } catch (e: IllegalArgumentException) {
+                            call.respond(HttpStatusCode.BadRequest, ErrorResponse(e.message ?: "Invalid request"))
+                        } catch (e: IllegalStateException) {
+                            call.respond(HttpStatusCode.Forbidden, ErrorResponse(e.message ?: "Forbidden"))
+                        } catch (e: Exception) {
+                            call.respond(
+                                HttpStatusCode.InternalServerError,
+                                ErrorResponse("Failed to get invite link: ${e.message}")
                             )
                         }
                     }
@@ -602,6 +637,99 @@ fun Application.configureClanRoutes(
                     }
                 }
             }
+
         }
-    }}
+        
+
+        // Root level routes (Web landing pages)
+        get("/join-clan") {
+            val token = call.request.queryParameters["token"]
+            val inviteCode = call.request.queryParameters["inviteCode"]
+            val clanId = call.request.queryParameters["clanId"]
+            
+            val deepLink = when {
+                token != null && clanId != null -> "apptime://screen/clan_detail?clanId=$clanId&token=$token"
+                token != null -> "apptime://screen/clan_detail?token=$token" // Fallback if clanId missing
+                inviteCode != null -> "apptime://screen/join_clan?inviteCode=$inviteCode"
+                else -> "apptime://screen/home"
+            }
+            
+            call.respondText(
+                contentType = ContentType.Text.Html,
+                text = """
+                <!DOCTYPE html>
+                <html>
+                <head>
+                    <title>Join Clan - AppTime</title>
+                    <meta name="viewport" content="width=device-width, initial-scale=1">
+                    <style>
+                        body {
+                            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+                            display: flex;
+                            flex-direction: column;
+                            align-items: center;
+                            justify-content: center;
+                            height: 100vh;
+                            margin: 0;
+                            background-color: #f5f5f7;
+                            color: #1d1d1f;
+                        }
+                        .container {
+                            background: white;
+                            padding: 2rem;
+                            border-radius: 1rem;
+                            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+                            text-align: center;
+                            max-width: 90%;
+                            width: 320px;
+                        }
+                        .logo {
+                            margin-bottom: 1.5rem;
+                            font-size: 3rem;
+                        }
+                        h1 {
+                            font-size: 1.5rem;
+                            margin-bottom: 0.5rem;
+                        }
+                        p {
+                            color: #86868b;
+                            margin-bottom: 2rem;
+                        }
+                        .btn {
+                            display: inline-block;
+                            background-color: #0071e3;
+                            color: white;
+                            padding: 12px 24px;
+                            border-radius: 980px;
+                            text-decoration: none;
+                            font-weight: 500;
+                            transition: background-color 0.2s;
+                            width: 100%;
+                            box-sizing: border-box;
+                        }
+                        .btn:hover {
+                            background-color: #0077ed;
+                        }
+                    </style>
+                    <script>
+                        window.onload = function() {
+                            // Try to open deep link immediately
+                            window.location.href = "$deepLink";
+                        }
+                    </script>
+                </head>
+                <body>
+                    <div class="container">
+                        <div class="logo">🛡️</div>
+                        <h1>Join Clan on AppTime</h1>
+                        <p>You've been invited to join a clan. Tap the button below to open the app.</p>
+                        <a href="$deepLink" class="btn">Open AppTime</a>
+                    </div>
+                </body>
+                </html>
+                """.trimIndent()
+            )
+        }
+    }
+}
 

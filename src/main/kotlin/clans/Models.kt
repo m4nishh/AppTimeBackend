@@ -156,9 +156,11 @@ data class CreateInviteRequest(
  * Request to join a clan
  */
 @Serializable
+
 data class JoinClanRequest(
     val clanId: Long? = null, // Either clanId or inviteCode must be provided
     val inviteCode: String? = null,
+    val token: String? = null, // Encrypted invite token
     val message: String? = null // Optional message for PRIVATE clans
 )
 
@@ -414,6 +416,17 @@ data class MemberActivityStats(
     val appCount: Int, // Number of unique apps used
     val categoryCount: Int, // Number of unique categories
     val rank: Int, // Rank based on screen time
+
     val topApps: List<TopAppUsage> = emptyList() // Top apps used by the member
+)
+
+/**
+ * Clan invite link response
+ */
+@Serializable
+data class ClanInviteLinkResponse(
+    val inviteLink: String,
+    val inviteCode: String,
+    val deeplink: String
 )
 

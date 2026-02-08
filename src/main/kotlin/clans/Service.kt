@@ -7,6 +7,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.datetime.Clock
+import kotlinx.datetime.Instant
 import kotlinx.datetime.toJavaInstant
 import users.UserRepository
 import kotlin.time.Duration.Companion.days
@@ -260,7 +261,22 @@ class ClanService(
     /**
      * Join a clan
      */
+
     fun joinClan(userId: String, request: JoinClanRequest): ClanMember {
+        // If token is provided, decode it and use the invite code
+        if (request.token != null) {
+            val pair = com.apptime.code.common.TokenEncoder.decodeClanInvite(request.token)
+                ?: throw IllegalArgumentException("Invalid invite token")
+            val (clanIdFromToken, inviteCodeFromToken) = pair
+            
+            // Validate clan ID matches if provided
+            if (request.clanId != null && request.clanId != clanIdFromToken) {
+                throw IllegalArgumentException("Token does not match provided clan ID")
+            }
+            
+            return repository.acceptInvite(inviteCodeFromToken, userId)
+        }
+
         // If invite code is provided, use it
         if (request.inviteCode != null) {
             return repository.acceptInvite(request.inviteCode, userId)
@@ -271,13 +287,21 @@ class ClanService(
             throw IllegalArgumentException("Either clanId or inviteCode must be provided")
         }
         
+
         val clan = repository.getClanById(request.clanId)
             ?: throw IllegalStateException("Clan not found")
+            
+        // Check if user is already a member
+        val existingMembership = repository.getUserClanMembership(userId, clan.id)
+        if (existingMembership != null) {
+            return existingMembership
+        }
         
         // Check clan type
         when (clan.clanType) {
-            "PUBLIC" -> {
-                // Anyone can join
+
+            "PUBLIC", "PRIVATE" -> {
+                // Anyone can join directly (PRIVATE clans are just hidden from search)
                 val member = repository.joinClan(request.clanId, userId)
                 
                 // Send notifications to all members
@@ -302,37 +326,6 @@ class ClanService(
                 }
                 
                 return member
-            }
-            "PRIVATE" -> {
-                // Requires approval - create join request
-                repository.createJoinRequest(request.clanId, userId, request.message)
-                
-                // Send notifications to admins and moderators
-                notificationService?.let { service ->
-                    getNotificationScope().launch {
-                        try {
-                            val members = repository.getClanMembers(request.clanId)
-                            val adminAndModeratorUserIds = members
-                                .filter { it.role in listOf("ADMIN", "MODERATOR") }
-                                .map { it.userId }
-                            
-                            if (adminAndModeratorUserIds.isNotEmpty()) {
-                                val username = userRepository?.getUserById(userId)?.username
-                                service.sendClanJoinRequestNotification(
-                                    clanId = request.clanId,
-                                    clanName = clan.name,
-                                    requesterUsername = username,
-                                    requesterUserId = userId,
-                                    adminAndModeratorUserIds = adminAndModeratorUserIds
-                                )
-                            }
-                        } catch (e: Exception) {
-                            // Log but don't fail the operation
-                        }
-                    }
-                }
-                
-                throw IllegalStateException("Join request created. Waiting for approval from clan admins.")
             }
             "INVITE_ONLY" -> {
                 throw IllegalStateException("This clan is invite-only. You need an invite code to join.")
@@ -784,11 +777,46 @@ class ClanService(
         val shareLink = "$baseUrl/clan/$encodedToken"
         val deeplink = "apptime://screen/clan_detail/$encodedToken"
         
+
         return ClanShareLinkResponse(
             clanId = clanId,
             shareLink = shareLink,
             deeplink = deeplink,
             shareCode = shareCode
+        )
+    }
+
+    /**
+     * Get permanent invite link for a clan (Admin/Moderator only)
+     */
+    fun getPermanentInviteLink(clanId: Long, userId: String, baseUrl: String): ClanInviteLinkResponse {
+        // Check if user is admin or moderator
+        val (userClan, member) = repository.getUserClanInfo(userId)
+//        if (userClan?.id != clanId) {
+//            throw IllegalStateException("User is not a member of this clan")
+//        }
+        if (member?.role !in listOf("ADMIN", "MODERATOR")) {
+            throw IllegalStateException("User does not have permission to create invite links")
+        }
+        
+
+        // Get or create permanent invite
+        val invite = repository.getOrCreateShareLink(clanId, userId)
+        
+        // Encode invite
+        val token = com.apptime.code.common.TokenEncoder.encodeClanInvite(clanId, invite.inviteCode)
+        val encodedToken = java.net.URLEncoder.encode(token, "UTF-8")
+        
+
+        // Construct links
+        // We use query parameters for clanId and token
+        val inviteLink = "$baseUrl/join-clan?clanId=$clanId&token=$encodedToken"
+        val deeplink = "apptime://screen/clan_detail?clanId=$clanId&token=$encodedToken"
+        
+        return ClanInviteLinkResponse(
+            inviteLink = inviteLink,
+            inviteCode = invite.inviteCode,
+            deeplink = deeplink
         )
     }
     
