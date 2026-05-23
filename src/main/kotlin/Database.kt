@@ -6,6 +6,7 @@ import com.apptime.code.challenges.ChallengeParticipants
 import com.apptime.code.challenges.ChallengeSeedData
 import com.apptime.code.challenges.Challenges
 import com.apptime.code.clans.*
+import com.apptime.code.cockroachs.Cockroachs
 import com.apptime.code.common.EnvLoader
 import com.apptime.code.consents.ConsentSeedData
 import com.apptime.code.consents.ConsentTemplates
@@ -274,7 +275,10 @@ object DatabaseFactory {
                 AppStats,
                 
                 // Feedback module
-                Feedback
+                Feedback,
+
+                // Cockroachs module
+                Cockroachs
                 )
             } catch (e: Exception) {
                 // If constraint creation fails due to duplicates, we need to clean up in a new transaction
@@ -330,7 +334,7 @@ object DatabaseFactory {
                                 Rewards, Coins, RewardCatalog, Transactions, UserReferralCodes, Referrals,
                                 Clans, ClanMembers, ClanStats, ClanInvites, ClanBadges, ClanJoinRequests,
                                 ClanShares, ClanShareEvents,
-                                FeatureFlags, AppStats, Feedback
+                                FeatureFlags, AppStats, Feedback, Cockroachs
                             )
                         }
                     } catch (retryException: Exception) {
